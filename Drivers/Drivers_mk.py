@@ -1,0 +1,34 @@
+from pathlib import Path, PosixPath
+
+
+def getSrcs(wk):
+    bsp = 'Drivers/BSP/STM32H747I-Discovery'
+    bsp_srcs = list(Path(bsp).rglob('*.c'))
+
+    hal = 'Drivers/STM32H7xx_HAL_Driver'
+    hal_srcs = list(Path(hal).rglob('*.c'))
+
+    no_hal_temp = list(Path(hal).rglob('*_template.c'))
+    hal_srcs = list(set(hal_srcs) - set(no_hal_temp))
+
+    no_hal_ll = list(Path(hal).rglob('stm32h7xx_ll_*'))
+    hal_srcs = list(set(hal_srcs) - set(no_hal_ll))
+
+    bsp_srcs.remove(PosixPath('Drivers/BSP/STM32H747I-Discovery/stm32h747i_discovery_audio.c'))
+    bsp_srcs.remove(PosixPath('Drivers/BSP/STM32H747I-Discovery/stm32h747i_discovery_lcd.c'))
+    bsp_srcs.remove(PosixPath('Drivers/BSP/STM32H747I-Discovery/stm32h747i_discovery_ts.c'))
+    bsp_srcs.remove(PosixPath('Drivers/BSP/STM32H747I-Discovery/stm32h747i_discovery_camera.c'))
+    
+    comp_srcs = ['Drivers/BSP/Components/lan8742/lan8742.c']
+    return bsp_srcs + hal_srcs + comp_srcs
+
+
+def getIncs(wk):
+    return [
+        'Drivers/BSP/STM32H747I-Discovery',
+        'Drivers/STM32H7xx_HAL_Driver/Inc',
+        'Drivers/STM32H7xx_HAL_Driver/Inc/Legacy',
+        'Drivers/CMSIS/Device/ST/STM32H7xx/Include/',
+        'Drivers/CMSIS/Include',
+        'Drivers/BSP/Components/lan8742'
+    ]
