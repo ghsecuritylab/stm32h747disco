@@ -10,7 +10,8 @@ def getProjectSettings():
 
 
 def getCompilerSet():
-    pfx = 'arm-none-eabi-'
+    toolchain = '/opt/gcc-arm-none-eabi-8-2018-q4-major/'
+    pfx = toolchain + 'bin/arm-none-eabi-'
     return {
         'CC':       pfx + 'gcc',
         'CXX':      pfx + 'g++',
@@ -21,12 +22,12 @@ def getCompilerSet():
         'SIZE':     pfx + 'size',
         'OBJDUMP':  pfx + 'objdump',
         'INCLUDES': [
-            '/usr/lib/arm-none-eabi/include',
-            '/usr/lib/arm-none-eabi/include/c++/6.3.1',
-            '/usr/lib/arm-none-eabi/include/c++/6.3.1/arm-none-eabi',
-            '/usr/lib/arm-none-eabi/include/c++/6.3.1/backward',
-            '/usr/lib/gcc/arm-none-eabi/6.3.1/include',
-            '/usr/lib/gcc/arm-none-eabi/6.3.1/include-fixed'
+            toolchain + 'arm-none-eabi/include',
+            toolchain + 'arm-none-eabi/include/c++/8.2.1',
+            toolchain + 'arm-none-eabi/include/c++/8.2.1/arm-none-eabi',
+            toolchain + 'arm-none-eabi/include/c++/8.2.1/backward',
+            toolchain + 'lib/gcc/arm-none-eabi/8.2.1/include',
+            toolchain + 'lib/gcc/arm-none-eabi/8.2.1/include-fixed'
         ]
     }
 
