@@ -5,6 +5,7 @@ import sys
 import os
 import time
 import subprocess
+import json
 
 
 def printHeader(key: str, num: int):
@@ -62,6 +63,7 @@ def read_Makefilepy():
     makevars = open('vars.mk', 'w')
 
     projSettings = None
+    compSet = None
     compOpts = None
 
     try:
@@ -117,14 +119,14 @@ def read_Makefilepy():
 
     makevars.close()
 
-    return projSettings, compOpts
+    return projSettings, compOpts, compSet
 # ------------------------------------------------------
 # ------------------------------------------------------
 # ------------------------------------------------------
 
 modules = []
 
-projSettings, compilerOpts = read_Makefilepy()
+projSettings, compilerOpts, compilerSettings = read_Makefilepy()
 
 # Load modules
 for filename in Path('./').rglob('*[.|_]mk.py'):
@@ -137,6 +139,8 @@ for filename in Path('./').rglob('*[.|_]mk.py'):
 
 # Write CSRC
 srcsfile = open('srcs.mk', 'w')
+
+includes = []
 
 for mod in modules:
 
@@ -154,6 +158,7 @@ for mod in modules:
 
     for inc in mod[1]:
         srcsfile.write("INCS += -I{}\n".format(inc))
+        includes.append(inc)
 
     srcsfile.write('\n')
 
@@ -166,3 +171,45 @@ for mod in modules:
     srcsfile.write('\n')
 
 srcsfile.close()
+
+
+# generate .vscode/c_cpp_properties.json
+
+strIncs = []
+
+if compilerSettings['INCLUDES']:
+    includes += compilerSettings['INCLUDES']
+    strIncs = [str(i) for i in includes]
+
+defines = []
+if compilerOpts['MACROS']:
+    deflist = compilerOpts['MACROS']
+    defines = [d.replace('-D', '') for d in deflist] 
+
+c_cpp_properties = {
+    "configurations": [
+        {
+            'name': 'ARM',
+            'defines': defines,
+            "compilerPath": "arm-none-eabi-gcc",
+            "intelliSenseMode": "gcc-x64",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "includePath": strIncs,
+            "browse": {
+                "path": strIncs,
+                "limitSymbolsToIncludedHeaders": True,
+                "databaseFilename": "${workspaceFolder}/.vscode/browse.vc.db"
+            }
+        }
+    ],
+    "version": 4
+}
+
+output = json.dumps(c_cpp_properties, indent=4)
+
+if not os.path.exists('.vscode'):
+    os.makedirs('.vscode')
+fileout = open(".vscode/c_cpp_properties.json", "w")
+fileout.write(output)
+fileout.close()

@@ -21,9 +21,9 @@
 #define __ETHERNETIF_H__
 
 
+#include "cmsis_os.h"
 #include "lwip/err.h"
 #include "lwip/netif.h"
-#include "cmsis_os.h"
 
 /* Exported types ------------------------------------------------------------*/
 /* Structure that include link thread parameters */

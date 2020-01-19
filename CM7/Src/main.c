@@ -19,8 +19,10 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+
 #include "cmsis_os.h"
 #include "App.h"
+#include "Log/lcd_log.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -38,6 +40,7 @@ static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
 static void Error_Handler(void);
 static void MPU_Config(void);
+static void BSP_Config(void);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -101,7 +104,7 @@ int main(void)
 
    /* Add Cortex-M7 user application code here */ 
   /* Configure LED1 */
-  BSP_LED_Init(LED1);
+  BSP_Config();
 
 #if SIMPLE_TASK
   /* Create the Thread that toggle LED1 */
@@ -131,13 +134,44 @@ static void CORE1_SemaphoreCoreSync(void const *argument)
   {
     /*Take Hw Semaphore 0*/
     HAL_HSEM_FastTake(HSEM_ID_0);
-    BSP_LED_Toggle(LED1);
+    LCD_UsrLog("  test\n");
     osDelay(500);
     /*Release Hw Semaphore 0 in order to notify the CPU2(CM4)*/
     HAL_HSEM_Release(HSEM_ID_0,0);
   }
 }
 #endif
+
+
+/**
+  * @brief  BSP Configuration
+  * @param  None
+  * @retval None
+  */
+static void BSP_Config(void)
+{
+#ifdef USE_LCD
+
+  /* Initialize the LCD */
+  BSP_LCD_Init();
+
+  BSP_LCD_LayerDefaultInit(0, LCD_FB_START_ADDRESS);
+
+  /* Initialize LCD Log module */
+  LCD_LOG_Init();
+
+  /* Show Header and Footer texts */
+  LCD_LOG_SetHeader((uint8_t *)"Webserver Application");
+  LCD_LOG_SetFooter((uint8_t *)"STM32H747I-DISCO board");
+
+  LCD_UsrLog("  State: Ethernet Initialization ...\n");
+#endif
+
+ BSP_LED_Init(LED1);
+ BSP_LED_Init(LED2);
+
+}
+
 
 /**
   * @brief  System Clock Configuration

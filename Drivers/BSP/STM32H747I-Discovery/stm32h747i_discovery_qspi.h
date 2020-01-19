@@ -36,7 +36,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32h7xx_hal.h"
-#include "../Components/mt25tl01g/mt25tl01g.h"
+#include "mt25tl01g.h"
 
 /** @addtogroup STM32H747I_DISCOVERY_QSPI
   * @{

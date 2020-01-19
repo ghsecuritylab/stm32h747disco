@@ -30,7 +30,7 @@
 /* Include LCD component Driver */
 
 /* Include OTM8009A LCD Driver IC driver code */
-#include "../Components/otm8009a/otm8009a.h"
+#include "otm8009a.h"
 
 #if defined(USE_LCD_HDMI)    
 /* Include ADV7533 HDMI Driver IC driver code */
@@ -41,7 +41,7 @@
 #include "stm32h747i_discovery_sdram.h"
 #include "stm32h747i_discovery.h"
 
-#include "../../../Utilities/Fonts/fonts.h"
+#include "Fonts/fonts.h"
 
 #include <string.h> /* use of memset() */
 

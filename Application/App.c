@@ -7,16 +7,23 @@
 
 #include "App.h"
 #include "FreeRTOSConfig.h"
-#include "cmsis_os.h"
 #include "ethernetif.h"
 #include "lwip/netif.h"
 #include "lwip/tcpip.h"
+#include "lwip/udp.h"
 #include "httpserver_netconn.h"
 #include "app_ethernet.h"
+#include <string.h>
+
+#include "cmsis_os.h"
+#include "lwipopts.h"
+#include "Log/lcd_log.h"
+#include "lwip/ip_addr.h"
 
 struct netif gnetif; /* network interface structure */
 
 static void APP_Task(const void *arg);
+static void APP_InternetTest(const void *arg);
 static void Netif_Config(void);
 
 void APP_Init() {
@@ -41,6 +48,9 @@ void APP_Task(const void *arg) {
 
 	/* Initialize webserver demo */
 	http_server_netconn_init();
+
+	osThreadDef(InternetTest_Thread, APP_InternetTest, osPriorityNormal, 0, configMINIMAL_STACK_SIZE*5);
+	osThreadCreate(osThread(InternetTest_Thread), NULL);
 
 	for (;;) {
 		/* Delete the Init Thread */
@@ -78,15 +88,51 @@ static void Netif_Config(void) {
 	ethernet_link_status_updated(&gnetif);
 
 #if LWIP_NETIF_LINK_CALLBACK
-  netif_set_link_callback(&gnetif, ethernet_link_status_updated);
+	netif_set_link_callback(&gnetif, ethernet_link_status_updated);
 
-  osThreadDef(EthLink, ethernet_link_thread, osPriorityNormal, 0, configMINIMAL_STACK_SIZE *2);
-  osThreadCreate (osThread(EthLink), &gnetif);
+	osThreadDef(EthLink, ethernet_link_thread, osPriorityNormal, 0, configMINIMAL_STACK_SIZE *2);
+	osThreadCreate (osThread(EthLink), &gnetif);
 #endif
 
 #if LWIP_DHCP
 	/* Start DHCPClient */
 	osThreadDef(DHCP, DHCP_Thread, osPriorityBelowNormal, 0, configMINIMAL_STACK_SIZE * 2);
-  osThreadCreate (osThread(DHCP), &gnetif);
+	osThreadCreate (osThread(DHCP), &gnetif);
 #endif
 }
+
+void udp_echo_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
+		const ip_addr_t *addr, u16_t port) {
+	if (p != NULL) {
+		char *msg = (char *)pvPortMalloc(p->len);
+		memcpy(msg, p->payload, p->len);
+		LCD_UsrLog("  Recv OK ...\n");
+		vPortFree(msg);
+		pbuf_free(p);
+	}
+}
+
+void APP_InternetTest(const void *arg) {
+
+	struct udp_pcb *ptel_pcb;
+	char msg[] = "testing";
+	struct pbuf *p;
+	ip4_addr_t dstAddr;
+	ip4addr_aton("207.246.65.130", &dstAddr);
+
+	ptel_pcb = udp_new();
+
+	udp_bind(ptel_pcb, IP_ADDR_ANY, 5000);
+	udp_recv(ptel_pcb, udp_echo_recv, NULL);
+
+	while (1) {
+		//Allocate packet buffer
+		p = pbuf_alloc(PBUF_TRANSPORT, sizeof(msg), PBUF_RAM);
+		memcpy(p->payload, msg, sizeof(msg));
+		udp_sendto(ptel_pcb, p, &dstAddr, 5000);
+		pbuf_free(p); //De-allocate packet buffer
+		vTaskDelay(5000); //some delay!
+	}
+
+}
+

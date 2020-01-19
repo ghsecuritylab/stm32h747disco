@@ -24,11 +24,16 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32h7xx_hal.h"
 #include "stm32h747i_discovery.h"
+#include "stm32h747i_discovery_sdram.h"
+#include "stm32h747i_discovery_lcd.h"
 
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
 #define SIMPLE_TASK	0
+
+#define USE_LCD
+
 /* Exported functions ------------------------------------------------------- */
 
 #endif /* __MAIN_H */

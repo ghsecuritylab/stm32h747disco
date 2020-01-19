@@ -19,7 +19,15 @@ def getCompilerSet():
         'AS':       pfx + 'as',
         'OBJCOPY':  pfx + 'objcopy',
         'SIZE':     pfx + 'size',
-        'OBJDUMP':  pfx + 'objdump'
+        'OBJDUMP':  pfx + 'objdump',
+        'INCLUDES': [
+            '/usr/lib/arm-none-eabi/include',
+            '/usr/lib/arm-none-eabi/include/c++/6.3.1',
+            '/usr/lib/arm-none-eabi/include/c++/6.3.1/arm-none-eabi',
+            '/usr/lib/arm-none-eabi/include/c++/6.3.1/backward',
+            '/usr/lib/gcc/arm-none-eabi/6.3.1/include',
+            '/usr/lib/gcc/arm-none-eabi/6.3.1/include-fixed'
+        ]
     }
 
 

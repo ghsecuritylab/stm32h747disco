@@ -24,9 +24,8 @@
 #include "lwip/apps/fs.h"
 #include "string.h"
 #include "httpserver_netconn.h"
-#include "cmsis_os.h"
-
 #include <stdio.h>
+#include "cmsis_os.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/

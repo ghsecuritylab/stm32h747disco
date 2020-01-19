@@ -44,15 +44,16 @@ $(TARGET): $(OBJECTS) $(LDSCRIPT)
 	$(LD) -o $@ $(OBJECTS) $(LDFLAGS)
 	$(OBJCOPY) -O ihex $@ $(TARGET_HEX)
 	$(SIZE) -Ax $@ > size.txt
-	@python pybuild/armsize.py -F 1024000 -R 128000 -s size.txt
+	@python pybuild/armsize.py -F 1024000 -R 1054000 -s size.txt
 	@rm size.txt
 
 
 all: $(TARGET)
-
 
 clean:
 	@echo 'CLEAN'
 	rm -rf $(PROJECT_OUT)
 
 .PHONY: clean
+
+# -include $(OBJECTS:.o=.d)
