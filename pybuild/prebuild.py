@@ -176,10 +176,11 @@ srcsfile.close()
 # generate .vscode/c_cpp_properties.json
 
 strIncs = []
-
+aux = []
 if compilerSettings['INCLUDES']:
-    includes += compilerSettings['INCLUDES']
-    strIncs = [str(i) for i in includes]
+    aux += compilerSettings['INCLUDES']
+    aux += includes
+    strIncs = [str(i) for i in aux]
 
 defines = []
 if compilerOpts['MACROS']:
@@ -213,3 +214,86 @@ if not os.path.exists('.vscode'):
 fileout = open(".vscode/c_cpp_properties.json", "w")
 fileout.write(output)
 fileout.close()
+
+
+# print("-------------------------------------------------")
+# print("All folders")
+# Exclude folders
+
+allIncFoldes = []
+includes = [str(i) for i in includes]
+
+for filename in Path('.').rglob('*.h'):
+    allIncFoldes.append(str(filename.parent))
+
+allIncFoldes = list(dict.fromkeys(allIncFoldes))
+
+allIncFoldes.sort()
+
+filtedist = []
+parent = ""
+for p in allIncFoldes:
+    if parent == "":
+        parent = p
+        filtedist.append(p)
+    elif(p.startswith(parent)):
+        None
+    else:
+        parent = p
+        filtedist.append(p)
+
+allIncFoldes = filtedist 
+
+# for a in allIncFoldes:
+#     print(a)
+
+
+# print("-------------------------------------------------")
+# print("Build Includes")
+# for inc in includes:
+#     print(inc)
+
+# print("-------------------------------------------------")
+# print("Filter")
+
+listToExclude = []
+
+for allinc in allIncFoldes:
+    if not any(allinc.startswith(a) for a in includes):
+        listToExclude.append(allinc)
+
+for r in listToExclude:
+    mvpath = Path(r)
+    if (mvpath.name.startswith("_")):
+        continue
+
+    if str(mvpath) == '.' or str(mvpath) == '..':
+        continue
+    
+    dstpath = str(mvpath.parent / str("_"+mvpath.name))
+    print("mv {} {}".format(mvpath, dstpath))
+    try:
+        os.rename(mvpath, dstpath)
+    except:
+        None
+
+listToInclude = []
+
+for inc in includes:
+    nameInc = Path(inc).name
+    pathExclude = str(Path(inc).parent / str("_"+nameInc))
+    if pathExclude in allIncFoldes:
+        listToInclude.append(pathExclude)
+
+# print("TO INCLUDE --------------------------------------")
+
+for t in listToInclude:
+    mvpath = Path(t)
+    if str(mvpath.name).startswith("_"):
+        dstname = str(mvpath.name)[1:]
+        dstpath = str(mvpath).replace(mvpath.name, dstname)
+        print("mv {} {}".format(mvpath, dstpath))
+        try:
+            os.rename(mvpath, dstpath)
+        except:
+            None

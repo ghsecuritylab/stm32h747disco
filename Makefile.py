@@ -40,6 +40,7 @@ def getCompilerOpts():
             '-DUSE_STM32H747I_Discovery',
             '-DUSE_IOEXPANDER',
             '-DCORE_CM7',
+            '-D__MPU_PRESENT=1'
         ],
         'MACHINE-OPTS': [
             '-mcpu=cortex-m7',

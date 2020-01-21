@@ -35,7 +35,7 @@ def getIncs(wk):
         'Drivers/BSP/STM32H747I-Discovery',
         'Drivers/STM32H7xx_HAL_Driver/Inc',
         'Drivers/STM32H7xx_HAL_Driver/Inc/Legacy',
-        'Drivers/CMSIS/Device/ST/STM32H7xx/Include/',
+        'Drivers/CMSIS/Device/ST/STM32H7xx/Include',
         'Drivers/CMSIS/Include',
         'Drivers/BSP/Components/lan8742',
         'Drivers/BSP/Components/mt25tl01g',
