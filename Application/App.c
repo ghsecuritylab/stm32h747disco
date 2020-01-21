@@ -20,25 +20,27 @@
 #include "Log/lcd_log.h"
 #include "lwip/ip_addr.h"
 
+
 struct netif gnetif; /* network interface structure */
 
 static void APP_Task(const void *arg);
 static void APP_InternetTest(const void *arg);
 static void Netif_Config(void);
 
-void APP_Init() {
+void APP_Init()
+{
 
 	BSP_LED_Init(LED1);
 	BSP_LED_Init(LED2);
 	BSP_LED_Init(LED3);
 	BSP_LED_Init(LED4);
 
-	osThreadDef(App_Thread, APP_Task, osPriorityNormal, 0, configMINIMAL_STACK_SIZE*5);
+	osThreadDef(App_Thread, APP_Task, osPriorityNormal, 0, configMINIMAL_STACK_SIZE * 5);
 	osThreadCreate(osThread(App_Thread), NULL);
-
 }
 
-void APP_Task(const void *arg) {
+void APP_Task(const void *arg)
+{
 
 	/* Create tcp_ip stack thread */
 	tcpip_init(NULL, NULL);
@@ -49,10 +51,11 @@ void APP_Task(const void *arg) {
 	/* Initialize webserver demo */
 	http_server_netconn_init();
 
-	osThreadDef(InternetTest_Thread, APP_InternetTest, osPriorityNormal, 0, configMINIMAL_STACK_SIZE*5);
+	osThreadDef(InternetTest_Thread, APP_InternetTest, osPriorityNormal, 0, configMINIMAL_STACK_SIZE * 5);
 	osThreadCreate(osThread(InternetTest_Thread), NULL);
 
-	for (;;) {
+	for (;;)
+	{
 		/* Delete the Init Thread */
 		osThreadTerminate(NULL);
 	}
@@ -63,7 +66,8 @@ void APP_Task(const void *arg) {
  * @param  None
  * @retval None
  */
-static void Netif_Config(void) {
+static void Netif_Config(void)
+{
 	ip_addr_t ipaddr;
 	ip_addr_t netmask;
 	ip_addr_t gw;
@@ -73,14 +77,13 @@ static void Netif_Config(void) {
 	ip_addr_set_zero_ip4(&netmask);
 	ip_addr_set_zero_ip4(&gw);
 #else
-  IP_ADDR4(&ipaddr,IP_ADDR0,IP_ADDR1,IP_ADDR2,IP_ADDR3);
-  IP_ADDR4(&netmask,NETMASK_ADDR0,NETMASK_ADDR1,NETMASK_ADDR2,NETMASK_ADDR3);
-  IP_ADDR4(&gw,GW_ADDR0,GW_ADDR1,GW_ADDR2,GW_ADDR3);
+	IP_ADDR4(&ipaddr, IP_ADDR0, IP_ADDR1, IP_ADDR2, IP_ADDR3);
+	IP_ADDR4(&netmask, NETMASK_ADDR0, NETMASK_ADDR1, NETMASK_ADDR2, NETMASK_ADDR3);
+	IP_ADDR4(&gw, GW_ADDR0, GW_ADDR1, GW_ADDR2, GW_ADDR3);
 #endif /* LWIP_DHCP */
 
 	/* add the network interface */
-	netif_add(&gnetif, &ipaddr, &netmask, &gw, NULL, &ethernetif_init,
-			&tcpip_input);
+	netif_add(&gnetif, &ipaddr, &netmask, &gw, NULL, &ethernetif_init, &tcpip_input);
 
 	/*  Registers the default network interface. */
 	netif_set_default(&gnetif);
@@ -90,20 +93,22 @@ static void Netif_Config(void) {
 #if LWIP_NETIF_LINK_CALLBACK
 	netif_set_link_callback(&gnetif, ethernet_link_status_updated);
 
-	osThreadDef(EthLink, ethernet_link_thread, osPriorityNormal, 0, configMINIMAL_STACK_SIZE *2);
-	osThreadCreate (osThread(EthLink), &gnetif);
+	osThreadDef(EthLink, ethernet_link_thread, osPriorityNormal, 0, configMINIMAL_STACK_SIZE * 2);
+	osThreadCreate(osThread(EthLink), &gnetif);
 #endif
 
 #if LWIP_DHCP
 	/* Start DHCPClient */
 	osThreadDef(DHCP, DHCP_Thread, osPriorityBelowNormal, 0, configMINIMAL_STACK_SIZE * 2);
-	osThreadCreate (osThread(DHCP), &gnetif);
+	osThreadCreate(osThread(DHCP), &gnetif);
 #endif
 }
 
 void udp_echo_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
-		const ip_addr_t *addr, u16_t port) {
-	if (p != NULL) {
+				   const ip_addr_t *addr, u16_t port)
+{
+	if (p != NULL)
+	{
 		char *msg = (char *)pvPortMalloc(p->len);
 		memcpy(msg, p->payload, p->len);
 		LCD_UsrLog("  Recv OK ...\n");
@@ -112,7 +117,8 @@ void udp_echo_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
 	}
 }
 
-void APP_InternetTest(const void *arg) {
+void APP_InternetTest(const void *arg)
+{
 
 	struct udp_pcb *ptel_pcb;
 	char msg[] = "testing";
@@ -125,14 +131,13 @@ void APP_InternetTest(const void *arg) {
 	udp_bind(ptel_pcb, IP_ADDR_ANY, 5000);
 	udp_recv(ptel_pcb, udp_echo_recv, NULL);
 
-	while (1) {
+	while (1)
+	{
 		//Allocate packet buffer
 		p = pbuf_alloc(PBUF_TRANSPORT, sizeof(msg), PBUF_RAM);
 		memcpy(p->payload, msg, sizeof(msg));
 		udp_sendto(ptel_pcb, p, &dstAddr, 5000);
-		pbuf_free(p); //De-allocate packet buffer
+		pbuf_free(p);	 //De-allocate packet buffer
 		vTaskDelay(5000); //some delay!
 	}
-
 }
-

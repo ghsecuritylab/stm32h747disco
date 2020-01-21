@@ -15,7 +15,6 @@ def getSrcs(wk):
     hal_srcs = list(set(hal_srcs) - set(no_hal_ll))
 
     bsp_srcs.remove(PosixPath('Drivers/BSP/STM32H747I-Discovery/stm32h747i_discovery_audio.c'))
-#     bsp_srcs.remove(PosixPath('Drivers/BSP/STM32H747I-Discovery/stm32h747i_discovery_lcd.c'))
     bsp_srcs.remove(PosixPath('Drivers/BSP/STM32H747I-Discovery/stm32h747i_discovery_ts.c'))
     bsp_srcs.remove(PosixPath('Drivers/BSP/STM32H747I-Discovery/stm32h747i_discovery_camera.c'))
     
