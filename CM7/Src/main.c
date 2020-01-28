@@ -20,8 +20,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include "App.h"
 #include "Log/lcd_log.h"
+#include "App.h"
 
 
 /* Private typedef -----------------------------------------------------------*/

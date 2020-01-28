@@ -215,6 +215,19 @@ fileout = open(".vscode/c_cpp_properties.json", "w")
 fileout.write(output)
 fileout.close()
 
+# generate .cproject from .cproject_template
+
+cproject_template = open('.cproject_template', 'r')
+cproject = open('.cproject', 'w')
+
+for line in cproject_template:
+    if(line.strip().startswith("<wildcard_project_include/>")):
+        for incs in includes:
+            cproject.write("<listOptionValue builtIn=\"false\" value=\"&quot;${workspace_loc:/stm32h747disco/"+str(incs)+"}&quot;\"/>\n")
+    
+    else:
+        cproject.write(line)
+
 
 # print("-------------------------------------------------")
 # print("All folders")

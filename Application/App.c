@@ -27,6 +27,7 @@ static void APP_Task(const void *arg);
 static void APP_InternetTest(const void *arg);
 static void Netif_Config(void);
 
+
 void APP_Init()
 {
 
@@ -39,6 +40,10 @@ void APP_Init()
 	osThreadCreate(osThread(App_Thread), NULL);
 }
 
+/**
+ * Application task loop
+ * @param arg
+ */
 void APP_Task(const void *arg)
 {
 

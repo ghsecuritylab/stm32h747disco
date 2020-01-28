@@ -58,28 +58,7 @@
 									<listOptionValue builtIn="false" value="/opt/gcc-arm-none-eabi-8-2018-q4-major/arm-none-eabi/include/c++/8.2.1/backward"/>
 									<listOptionValue builtIn="false" value="/opt/gcc-arm-none-eabi-8-2018-q4-major/arm-none-eabi/include/c++/8.2.1/arm-none-eabi"/>
 
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/CM7/Inc}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Application}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Tools/Inc}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/STM32H747I-Discovery}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/STM32H7xx_HAL_Driver/Inc}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/STM32H7xx_HAL_Driver/Inc/Legacy}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/CMSIS/Device/ST/STM32H7xx/Include}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/CMSIS/Include}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/lan8742}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/mt25tl01g}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/otm8009a}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/LwIP/src/include}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/LwIP/system}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/LwIP/src/apps/httpd}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/include}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Utilities}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/HttpServer/Src}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/HttpServer/Inc}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/LcdLog}&quot;"/>
+									<wildcard_project_include/>
 
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.2021731310" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c"/>
