@@ -36,8 +36,6 @@ void APP_Init()
 	BSP_LED_Init(LED3);
 	BSP_LED_Init(LED4);
 
-	APP_Task(arg);
-
 	osThreadDef(App_Thread, APP_Task, osPriorityNormal, 0, configMINIMAL_STACK_SIZE * 5);
 	osThreadCreate(osThread(App_Thread), NULL);
 }
