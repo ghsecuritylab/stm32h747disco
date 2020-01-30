@@ -6,6 +6,7 @@ import os
 import time
 import subprocess
 import json
+import eclipse_cproject as cp
 
 
 def printHeader(key: str, num: int):
@@ -41,9 +42,9 @@ def readModule(srcs: list, incs: list, flags: list, modPath, compilerOpts):
     lib.loader.exec_module(mod)
     defList = []
     workspace = {
-        'modPath': modPath.parent, 
+        'modPath': modPath.parent,
         'compilerOpts': compilerOpts
-        }
+    }
     result = getattr(mod, 'getSrcs')(workspace)
     addToList(srcs, result)
     result = getattr(mod, 'getIncs')(workspace)
@@ -110,7 +111,8 @@ def read_Makefilepy():
         if isinstance(linkOpts, dict):
             for keys in linkOpts:
                 makevars.write('# {0}\n'.format(keys))
-                makevars.write('LDFLAGS += {}\n'.format(listToString(linkOpts[keys])))
+                makevars.write(
+                    'LDFLAGS += {}\n'.format(listToString(linkOpts[keys])))
         elif isinstance(linkOpts, list):
             for item in linkOpts:
                 makevars.write('LDFLAGS += {}\n'.format(item))
@@ -123,6 +125,7 @@ def read_Makefilepy():
 # ------------------------------------------------------
 # ------------------------------------------------------
 # ------------------------------------------------------
+
 
 modules = []
 
@@ -185,7 +188,7 @@ if compilerSettings['INCLUDES']:
 defines = []
 if compilerOpts['MACROS']:
     deflist = compilerOpts['MACROS']
-    defines = [d.replace('-D', '') for d in deflist] 
+    defines = [d.replace('-D', '') for d in deflist]
 
 c_cpp_properties = {
     "configurations": [
@@ -217,17 +220,31 @@ fileout.close()
 
 # generate .cproject from .cproject_template
 
-cproject_template = open('.cproject_template', 'r')
-cproject = open('.cproject', 'w')
+# cproject_template = open('.cproject_template', 'r')
+# cproject = open('.cproject', 'w')
 
-for line in cproject_template:
-    if(line.strip().startswith("<wildcard_project_include/>")):
-        for incs in includes:
-            cproject.write("<listOptionValue builtIn=\"false\" value=\"&quot;${workspace_loc:/stm32h747disco/"+str(incs)+"}&quot;\"/>\n")
-    
-    else:
-        cproject.write(line)
+# directory = Path("./srcs.mk")
+# directory = str(directory.absolute().parent.name)
 
+# for line in cproject_template:
+#     if(line.strip().startswith("<wildcard_project_include/>")):
+
+#         if compilerSettings['INCLUDES']:
+#             for compIncs in compilerSettings['INCLUDES']:
+#                 cproject.write("<listOptionValue builtIn=\"false\" value=\""+ str(compIncs) + "\"/>\n")
+
+#         for incs in includes:
+#             cproject.write("<listOptionValue builtIn=\"false\" value=\"&quot;${workspace_loc:/"+directory+"/"+str(incs)+"}&quot;\"/>\n")
+
+#     else:
+#         cproject.write(line)
+
+cproject_setting = {
+    'C_INCLUDES': strIncs,
+    'C_SYMBOLS': defines
+}
+
+cp.generate_cproject(cproject_setting)
 
 # print("-------------------------------------------------")
 # print("All folders")
@@ -255,7 +272,7 @@ for p in allIncFoldes:
         parent = p
         filtedist.append(p)
 
-allIncFoldes = filtedist 
+allIncFoldes = filtedist
 
 # for a in allIncFoldes:
 #     print(a)
@@ -282,7 +299,7 @@ for r in listToExclude:
 
     if str(mvpath) == '.' or str(mvpath) == '..':
         continue
-    
+
     dstpath = str(mvpath.parent / str("_"+mvpath.name))
     print("mv {} {}".format(mvpath, dstpath))
     try:

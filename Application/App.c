@@ -20,6 +20,9 @@
 #include "Log/lcd_log.h"
 #include "lwip/ip_addr.h"
 
+#ifndef VERSION
+#define VERSION "X.X.X"
+#endif
 
 struct netif gnetif; /* network interface structure */
 
@@ -116,7 +119,8 @@ void udp_echo_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
 	{
 		char *msg = (char *)pvPortMalloc(p->len);
 		memcpy(msg, p->payload, p->len);
-		LCD_UsrLog("  Recv OK ...\n");
+		const char ver[] = "   RECV OK ... " VERSION "\n";
+		LCD_UsrLog(ver);
 		vPortFree(msg);
 		pbuf_free(p);
 	}
