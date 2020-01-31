@@ -3,3 +3,4 @@ Release/
 .vscode/
 vars.mk
 srcs.mk
+.settings/
