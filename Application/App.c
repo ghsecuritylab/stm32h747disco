@@ -76,6 +76,8 @@ void APP_Task(const void *arg)
  */
 static void Netif_Config(void)
 {
+
+
 	ip_addr_t ipaddr;
 	ip_addr_t netmask;
 	ip_addr_t gw;
