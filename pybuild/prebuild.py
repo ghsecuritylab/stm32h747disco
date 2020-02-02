@@ -6,7 +6,10 @@ import os
 import time
 import subprocess
 import json
-import eclipse_cproject as cp
+from . import eclipse_cproject as cp
+from dis import dis
+from _cffi_backend import string
+from doctest import master
 
 
 def printHeader(key: str, num: int):
@@ -23,6 +26,22 @@ def listToString(l):
     aux.strip()
     return aux
 
+def macrosDictToString(macros):
+    mstr = []
+    if isinstance(macros, dict):
+        for key in macros:
+            if macros[key] != None and macros[key] != '':
+                if isinstance(macros[key], str):
+                    mstr.append('-D{}=\\\"{}\\\"'.format(key, macros[key]))
+                elif isinstance(macros[key], bool):
+                    mstr.append('-D{}={}'.format(key, '1' if macros[key] else '0'))
+                else:
+                    mstr.append('-D{}={}'.format(key, macros[key]))
+            else:
+                mstr.append('-D{}'.format(key))
+    
+    print(mstr)
+    return ' '.join(mstr)
 
 def addToList(dstList: list, values):
     if isinstance(values, list):
@@ -94,10 +113,13 @@ def read_Makefilepy():
     try:
         compOpts = getattr(mod, 'getCompilerOpts')()
         if isinstance(compOpts, dict):
-            for keys in compOpts:
-                makevars.write('# {0}\n'.format(keys))
-                makevars.write(
-                    'COMPILER_FLAGS += {}\n'.format(listToString(compOpts[keys])))
+            for key in compOpts:
+                makevars.write('# {0}\n'.format(key))
+                if (key == 'MACROS' and isinstance(compOpts[key], dict)):
+                    makevars.write('COMPILER_FLAGS += {}\n'.format(macrosDictToString(compOpts[key])))
+                else:
+                    makevars.write('COMPILER_FLAGS += {}\n'.format(listToString(compOpts[key])))
+        
         elif isinstance(compOpts, list):
             for item in compOpts:
                 makevars.write('COMPILER_FLAGS += {}\n'.format(item))
@@ -241,7 +263,7 @@ fileout.close()
 
 cproject_setting = {
     'C_INCLUDES': strIncs,
-    'C_SYMBOLS': defines
+    'C_SYMBOLS': compilerOpts['MACROS']
 }
 
 cp.generate_cproject(cproject_setting)

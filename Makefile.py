@@ -1,5 +1,6 @@
 import os
 from os.path import basename
+from pybuild import git
 
 
 def getProjectSettings():
@@ -33,15 +34,23 @@ def getCompilerSet():
 
 
 def getCompilerOpts():
+
+    PROJECT_DEF = {
+        'USE_HAL_DRIVE':            None,
+        'STM32H747xx':              None,
+        'USE_STM32H747I_Discovery': None,
+        'USE_IOEXPANDER':           None,
+        'CORE_CM7':                 None,
+        'VERSION':                  "1.0.1",
+        'IS_BETA':                  False,
+        'APP_NUMBER':               1,
+        'COMMIT_HASH':              git.getCommitHash(),
+        'BRANCH_NAME':              git.getBranchName(),
+        'CODE_VERSION':             git.getDescribe()
+    }
+
     return {
-        'MACROS': [
-            '-DUSE_HAL_DRIVER',
-            '-DSTM32H747xx',
-            '-DUSE_STM32H747I_Discovery',
-            '-DUSE_IOEXPANDER',
-            '-DCORE_CM7',
-            '-DVERSION=\\"1.0.1\\"'
-        ],
+        'MACROS': PROJECT_DEF,
         'MACHINE-OPTS': [
             '-mcpu=cortex-m7',
             '-mfpu=fpv5-d16',
@@ -77,7 +86,7 @@ def getCompilerOpts():
 def getLinkerOpts():
     return {
         'LINKER-SCRIPT': [
-            '-TSTM32H747XIHx_FLASH_CM7_ETH.ld'
+            '-TPort/STM32H7xx/STM32H747XIHx_FLASH_CM7_ETH.ld'
         ],
         'MACHINE-OPTS': [
             '-mcpu=cortex-m7',

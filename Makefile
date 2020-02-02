@@ -4,6 +4,6 @@
 	@time -p $(MAKE) -j$(nproc) -s -f makefile.mk $@
 
 prebuild:
-	@python -B pybuild/prebuild.py
+	@python -B __init__.py
 
 .INTERMEDIATE: prebuild

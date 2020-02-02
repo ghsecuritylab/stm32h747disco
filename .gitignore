@@ -4,3 +4,8 @@ Release/
 vars.mk
 srcs.mk
 .settings/
+
+
+__pycache__/
+*.py[cod]
+*$py.class

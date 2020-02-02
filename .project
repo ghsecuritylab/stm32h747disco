@@ -32,12 +32,12 @@
 	</natures>
 	<filteredResources>
 		<filter>
-			<id>1579645193394</id>
+			<id>1580594077151</id>
 			<name></name>
 			<type>30</type>
 			<matcher>
 				<id>org.eclipse.ui.ide.multiFilter</id>
-				<arguments>1.0-name-matches-false-true-^_.*</arguments>
+				<arguments>1.0-name-matches-false-true-^_[a-zA-Z0-9].*</arguments>
 			</matcher>
 		</filter>
 	</filteredResources>

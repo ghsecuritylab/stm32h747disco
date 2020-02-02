@@ -121,8 +121,12 @@ void udp_echo_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
 	{
 		char *msg = (char *)pvPortMalloc(p->len);
 		memcpy(msg, p->payload, p->len);
-		const char ver[] = "   RECV OK ... " VERSION "\n";
+		const char ver[] = "   RECV OK ... " __VERSION__ "\n";
 		LCD_UsrLog(ver);
+#if IS_BETA
+		const char beta[] = " BETA \n";
+		LCD_UsrLog(beta);
+#endif
 		vPortFree(msg);
 		pbuf_free(p);
 	}

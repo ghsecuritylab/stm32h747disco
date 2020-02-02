@@ -1,9 +1,9 @@
-from preutil import *
+from pybuild import preutil as p
 
 
 def getSrcs(wk):
-    return getAllSrcs(wk, SrcType.C)    
+    return p.getAllSrcs(wk, p.SrcType.C)    
 
     
 def getIncs(wk):
-    return getAllIncs(wk, IncType.C)
+    return p.getAllIncs(wk, p.IncType.C)

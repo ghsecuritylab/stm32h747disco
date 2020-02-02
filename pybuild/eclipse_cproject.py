@@ -56,8 +56,21 @@ def writeXmlIncludes(incList):
 
 def writeXmlSymbols(symList):
     w = []
-    for sym in symList:
-        sym = str(sym).replace("\\\"", "&quot;")
-        w.append("<listOptionValue builtIn=\"false\" value=\""+sym+"\"/>\n")
+    
+    if isinstance(symList, dict):
+        for key in symList:
+            if symList[key] != None and symList[key] != '':
+                if isinstance(symList[key], str):
+                    w.append('<listOptionValue builtIn=\"false\" value=\"{}=&quot;{}&quot;\"/>\n'.format(key, symList[key]))
+                elif isinstance(symList[key], bool):
+                    w.append('<listOptionValue builtIn=\"false\" value=\"{}={}\"/>\n'.format(key, '1' if symList[key] else '0'))
+                else:
+                    w.append('<listOptionValue builtIn=\"false\" value=\"{}={}\"/>\n'.format(key, symList[key]))
+            else:
+                w.append('<listOptionValue builtIn=\"false\" value=\"{}\"/>\n'.format(key))
+    else:
+        for sym in symList:
+            sym = str(sym).replace("\\\"", "&quot;")
+            w.append("<listOptionValue builtIn=\"false\" value=\""+sym+"\"/>\n")
 
     return ''.join(w)
