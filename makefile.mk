@@ -56,4 +56,4 @@ clean:
 
 .PHONY: clean
 
-# -include $(OBJECTS:.o=.d)
+-include $(OBJECTS:.o=.d)

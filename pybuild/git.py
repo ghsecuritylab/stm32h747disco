@@ -1,14 +1,16 @@
 import subprocess
 
+
 def getCommitHash(abbreviated=True):
     hashValue = ''
-    cmdLong = ['git', 'rev-parse', 'HEAD']
-    cmdSort = ["git", "describe", "--always"]
+    cmd = ['git', 'rev-parse', 'HEAD']
     try:
-        hashValue = subprocess.check_output(cmdSort if abbreviated else cmdLong).strip().decode('utf-8')
+        hashValue = subprocess.check_output(cmd).strip().decode('utf-8')
+        if hashValue:
+            hashValue = hashValue[:7] if abbreviated else hashValue
     except:
         print('WARNING: Can not get commit hash')
-
+        
     return hashValue
 
 
