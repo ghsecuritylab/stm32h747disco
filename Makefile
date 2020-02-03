@@ -6,4 +6,8 @@
 prebuild:
 	@python -B __init__.py
 
+.PHONY: test
+test:
+	@python testing.py ${MODULE}
+
 .INTERMEDIATE: prebuild

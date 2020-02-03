@@ -5,7 +5,9 @@
  *      Author: Ericson Joseph
  */
 
+/*<test>*/
 #include "App.h"
+/*</test>*/
 #include "FreeRTOSConfig.h"
 #include "ethernetif.h"
 #include "lwip/netif.h"
@@ -156,3 +158,12 @@ void APP_InternetTest(const void *arg)
 		vTaskDelay(5000); //some delay!
 	}
 }
+
+
+/*<test>*/
+
+int32_t APP_sum(int32_t a, int32_t b) {
+	return a + b;
+}
+
+/*</test>*/

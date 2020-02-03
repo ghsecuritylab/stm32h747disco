@@ -9,3 +9,5 @@ srcs.mk
 __pycache__/
 *.py[cod]
 *$py.class
+
+ws_ceedling/build/

@@ -102,9 +102,9 @@
 <listOptionValue builtIn="false" value="VERSION=&quot;1.0.1&quot;"/>
 <listOptionValue builtIn="false" value="IS_BETA=0"/>
 <listOptionValue builtIn="false" value="APP_NUMBER=1"/>
-<listOptionValue builtIn="false" value="COMMIT_HASH=&quot;ac0aab1&quot;"/>
-<listOptionValue builtIn="false" value="BRANCH_NAME=&quot;master&quot;"/>
-<listOptionValue builtIn="false" value="CODE_VERSION=&quot;v0.0.3-1-gac0aab1&quot;"/>
+<listOptionValue builtIn="false" value="COMMIT_HASH=&quot;b9eeadb&quot;"/>
+<listOptionValue builtIn="false" value="BRANCH_NAME=&quot;testing&quot;"/>
+<listOptionValue builtIn="false" value="CODE_VERSION=&quot;v0.0.3-2-gb9eeadb&quot;"/>
 
 								</option>
 								<inputType id="org.eclipse.cdt.build.core.settings.holder.inType.994335435" languageId="org.eclipse.cdt.core.gcc" languageName="GNU C" sourceContentType="org.eclipse.cdt.core.cSource,org.eclipse.cdt.core.cHeader" superClass="org.eclipse.cdt.build.core.settings.holder.inType"/>
