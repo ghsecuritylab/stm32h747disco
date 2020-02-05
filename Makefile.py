@@ -86,7 +86,7 @@ def getCompilerOpts():
 def getLinkerOpts():
     return {
         'LINKER-SCRIPT': [
-            '-TPort/STM32H7xx/STM32H747XIHx_FLASH_CM7_ETH.ld'
+            '-TPort/STM32H7xx/linker/STM32H747XIHx_FLASH_CM7_ETH.ld'
         ],
         'MACHINE-OPTS': [
             '-mcpu=cortex-m7',

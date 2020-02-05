@@ -33,9 +33,7 @@
 <listOptionValue builtIn="false" value="/opt/gcc-arm-none-eabi-8-2018-q4-major/arm-none-eabi/include/c++/8.2.1/backward"/>
 <listOptionValue builtIn="false" value="/opt/gcc-arm-none-eabi-8-2018-q4-major/lib/gcc/arm-none-eabi/8.2.1/include"/>
 <listOptionValue builtIn="false" value="/opt/gcc-arm-none-eabi-8-2018-q4-major/lib/gcc/arm-none-eabi/8.2.1/include-fixed"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/CM7/Inc}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Application}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Tools/Inc}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/STM32H747I-Discovery}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/STM32H7xx_HAL_Driver/Inc}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/STM32H7xx_HAL_Driver/Inc/Legacy}&quot;"/>
@@ -52,9 +50,10 @@
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/include}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Utilities}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/HttpServer/Src}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/HttpServer/Inc}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/LcdLog}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/Network/Src}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/Network/Inc}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/CM7/Inc}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/Logger/LCDLog}&quot;"/>
 									<!--wildcard_c_includes-->
 
 								</option>
@@ -68,9 +67,7 @@
 <listOptionValue builtIn="false" value="/opt/gcc-arm-none-eabi-8-2018-q4-major/arm-none-eabi/include/c++/8.2.1/backward"/>
 <listOptionValue builtIn="false" value="/opt/gcc-arm-none-eabi-8-2018-q4-major/lib/gcc/arm-none-eabi/8.2.1/include"/>
 <listOptionValue builtIn="false" value="/opt/gcc-arm-none-eabi-8-2018-q4-major/lib/gcc/arm-none-eabi/8.2.1/include-fixed"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/CM7/Inc}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Application}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Tools/Inc}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/STM32H747I-Discovery}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/STM32H7xx_HAL_Driver/Inc}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/STM32H7xx_HAL_Driver/Inc/Legacy}&quot;"/>
@@ -87,9 +84,10 @@
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/include}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Utilities}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/HttpServer/Src}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/HttpServer/Inc}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/LcdLog}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/Network/Src}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/Network/Inc}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/CM7/Inc}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/Logger/LCDLog}&quot;"/>
 									<!--wildcard_c_includes-->
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="org.eclipse.cdt.build.core.settings.holder.symbols.1546279114" superClass="org.eclipse.cdt.build.core.settings.holder.symbols" valueType="definedSymbols">
@@ -102,9 +100,9 @@
 <listOptionValue builtIn="false" value="VERSION=&quot;1.0.1&quot;"/>
 <listOptionValue builtIn="false" value="IS_BETA=0"/>
 <listOptionValue builtIn="false" value="APP_NUMBER=1"/>
-<listOptionValue builtIn="false" value="COMMIT_HASH=&quot;b9eeadb&quot;"/>
+<listOptionValue builtIn="false" value="COMMIT_HASH=&quot;81dd172&quot;"/>
 <listOptionValue builtIn="false" value="BRANCH_NAME=&quot;testing&quot;"/>
-<listOptionValue builtIn="false" value="CODE_VERSION=&quot;v0.0.3-2-gb9eeadb&quot;"/>
+<listOptionValue builtIn="false" value="CODE_VERSION=&quot;v0.0.3-3-g81dd172&quot;"/>
 
 								</option>
 								<inputType id="org.eclipse.cdt.build.core.settings.holder.inType.994335435" languageId="org.eclipse.cdt.core.gcc" languageName="GNU C" sourceContentType="org.eclipse.cdt.core.cSource,org.eclipse.cdt.core.cHeader" superClass="org.eclipse.cdt.build.core.settings.holder.inType"/>

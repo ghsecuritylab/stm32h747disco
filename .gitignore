@@ -10,4 +10,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-ws_ceedling/build/
+Test/ceedling/build/*
+Test/ceedling/src/*
+Test/ceedling/test/*

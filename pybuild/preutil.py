@@ -6,7 +6,7 @@ class SrcType:
     CPP = ['.C', '.cc', '.cpp', '.CPP', '.c++', '.cp', '.cxx']
     ASM = ['.s', '.S', '.asm']
 
-    
+
 class IncType:
     C = ['.h']
     CPP = ['.h', '.hpp', '.h++', '.hh']
@@ -19,11 +19,15 @@ def getAllSrcs(wk, srcType: SrcType):
     return srcs
 
 
+def getAllSrcs_C(wk):
+    return getAllSrcs(wk, SrcType.C)
+
+
 def getSrcsByRgx(wk, *regexs):
     srcs = []
     for r in regexs:
         srcs += list(Path(wk['modPath']).rglob(r))
-        
+
     srcs = list(dict.fromkeys(srcs))
     return srcs
 
@@ -32,10 +36,14 @@ def getAllIncs(wk, incType: IncType):
     incsfiles = []
     for ext in incType:
         incsfiles += list(Path(wk['modPath']).rglob('*' + ext))
-    
+
     incs = []
     for i in incsfiles:
         incs.append(i.parent)
-        
+
     incs = list(dict.fromkeys(incs))
     return incs
+
+
+def getAllIncs_C(wk):
+    return getAllIncs(wk, IncType.C)

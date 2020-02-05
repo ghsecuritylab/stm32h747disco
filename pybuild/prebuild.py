@@ -7,9 +7,6 @@ import time
 import subprocess
 import json
 from . import eclipse_cproject as cp
-from dis import dis
-from _cffi_backend import string
-from doctest import master
 
 
 def printHeader(key: str, num: int):
@@ -59,7 +56,6 @@ def readModule(srcs: list, incs: list, flags: list, modPath, compilerOpts):
     lib = importlib.util.spec_from_file_location(str(modPath), str(modPath))
     mod = importlib.util.module_from_spec(lib)
     lib.loader.exec_module(mod)
-    defList = []
     workspace = {
         'modPath': modPath.parent,
         'compilerOpts': compilerOpts
@@ -317,6 +313,9 @@ for allinc in allIncFoldes:
 for r in listToExclude:
     mvpath = Path(r)
     if (mvpath.name.startswith("_")):
+        continue
+    
+    if Path('Test') in mvpath.parents:
         continue
 
     if str(mvpath) == '.' or str(mvpath) == '..':

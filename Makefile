@@ -7,7 +7,8 @@ prebuild:
 	@python -B __init__.py
 
 .PHONY: test
-test:
-	@python testing.py ${MODULE}
+test_%:
+	@python testing.py $(subst test_,,$@)
+	$(MAKE) -C Test/ceedling $(subst test_,,$@)
 
 .INTERMEDIATE: prebuild

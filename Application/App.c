@@ -166,4 +166,8 @@ int32_t APP_sum(int32_t a, int32_t b) {
 	return a + b;
 }
 
+int32_t APP_multi(int32_t a, int32_t b) {
+	return a * b;
+}
+
 /*</test>*/

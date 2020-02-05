@@ -1,8 +1,10 @@
 import sys
 import re
 from pathlib import Path
+import os
+import shutil
 
-ceedlingPath = Path('ws_ceedling')
+ceedlingPath = Path('Test/ceedling')
 testrgx = re.compile('^[ ]*[/][*][ ]*[<][ ]*test[ ]*[>][ ]*[*][/].*')
 testrwgend = re.compile('^[ ]*[/][*][ ]*[<][ ]*[/]test[ ]*[>][ ]*[*][/].*')
 
@@ -44,26 +46,24 @@ else:
     incfile = findFile(h_file)
     if incfile:
         print(incfile)
-
-    srcbycl = open('ws_ceedling/src/' + c_file, 'w')
-    srcfile = open(srcfile, 'r')
-    # count = 0
-    # for line in srcfile:
-
-    #     if testrgx.match(line):
-    #         count = count + 1
-    #     elif testrwgend.match(line):
-    #         srcbycl.write(line)
-    #         count = count - 1
         
-    #     if count > 0:
-    #         srcbycl.write(line)
+    testFile = 'Test' / srcfile.parent / Path('test_'+srcfile.name)
+    ceedlingTest = 'Test/ceedling/test/' / Path('test_'+srcfile.name)
+    shutil.copyfile(testFile, ceedlingTest)
+    print("cp {} {}".format(testFile, ceedlingTest))
+
+    srcbycl = open('Test/ceedling/src/' + c_file, 'w')
+    srcfile = open(srcfile, 'r')
+
     generateTestSrc(srcfile, srcbycl)
  
-    incbycl = open('ws_ceedling/src/' + h_file, 'w')
+    incbycl = open('Test/ceedling/src/' + h_file, 'w')
     incfile = open(incfile, 'r')
 
     generateTestSrc(incfile, incbycl)
 
     srcbycl.close()
     srcfile.close()
+    
+    
+    
