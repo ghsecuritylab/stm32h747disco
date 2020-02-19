@@ -1,3 +1,5 @@
+#include <AudioPlayer.h>
+
 /*
  * App.c
  *
@@ -19,37 +21,38 @@
 
 #include "cmsis_os.h"
 #include "lwipopts.h"
-#include "Log/lcd_log.h"
+#include "lcd_trace.h"
 #include "lwip/ip_addr.h"
+#include "LcdLog.h"
+#include <stdint.h>
 
 #ifndef VERSION
 #define VERSION "X.X.X"
 #endif
 
 struct netif gnetif; /* network interface structure */
+static uint16_t count = 0;
 
-static void APP_Task(const void *arg);
+static void APP_task(const void *arg);
 static void APP_InternetTest(const void *arg);
 static void Netif_Config(void);
 
 
-void APP_Init()
+void APP_init()
 {
 
-	BSP_LED_Init(LED1);
-	BSP_LED_Init(LED2);
-	BSP_LED_Init(LED3);
-	BSP_LED_Init(LED4);
-
-	osThreadDef(App_Thread, APP_Task, osPriorityNormal, 0, configMINIMAL_STACK_SIZE * 5);
+	osThreadDef(App_Thread, APP_task, osPriorityNormal, 0, configMINIMAL_STACK_SIZE * 5);
 	osThreadCreate(osThread(App_Thread), NULL);
+
+
+
 }
 
 /**
  * Application task loop
  * @param arg
  */
-void APP_Task(const void *arg)
+void APP_task(const void *arg)
 {
 
 	/* Create tcp_ip stack thread */
@@ -123,8 +126,7 @@ void udp_echo_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
 	{
 		char *msg = (char *)pvPortMalloc(p->len);
 		memcpy(msg, p->payload, p->len);
-		const char ver[] = "   RECV OK ... " CODE_VERSION " " COMMIT_HASH "\n";
-		LCD_UsrLog(ver);
+		LCDLog_RLog(1, "RECV OK %s %d", CODE_VERSION, count++);
 #if IS_BETA
 		const char beta[] = " BETA \n";
 		LCD_UsrLog(beta);
@@ -148,14 +150,20 @@ void APP_InternetTest(const void *arg)
 	udp_bind(ptel_pcb, IP_ADDR_ANY, 5000);
 	udp_recv(ptel_pcb, udp_echo_recv, NULL);
 
+	AudioPlayer_Init();
+
 	while (1)
 	{
+//		if (gnetif.flags & NETIF_FLAG_LINK_UP){
+//			vTaskDelay(1000);
+//			continue;
+//		}
 		//Allocate packet buffer
 		p = pbuf_alloc(PBUF_TRANSPORT, sizeof(msg), PBUF_RAM);
 		memcpy(p->payload, msg, sizeof(msg));
 		udp_sendto(ptel_pcb, p, &dstAddr, 5000);
 		pbuf_free(p);	 //De-allocate packet buffer
-		vTaskDelay(5000); //some delay!
+		osDelay(1000); //some delay!
 	}
 }
 

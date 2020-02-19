@@ -7,7 +7,7 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
+  * <h2><center>&copy; Copyright (c) 2018 STMicroelectronics.
   * All rights reserved.</center></h2>
   *
   * This software component is licensed by ST under BSD 3-Clause license,
@@ -17,42 +17,118 @@
   *
   ******************************************************************************
   */
-
-/** @addtogroup BSP
-  * @{
-  */
-
-/** @addtogroup STM32H747I_DISCOVERY
-  * @{
-  */
-
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __STM32H747I_DISCOVERY_QSPI_H
-#define __STM32H747I_DISCOVERY_QSPI_H
+#ifndef STM32H747I_DISCO_QSPI_H
+#define STM32H747I_DISCO_QSPI_H
 
 #ifdef __cplusplus
  extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32h7xx_hal.h"
+#include "stm32h747i_discovery_conf.h"
+#include "stm32h747i_discovery_errno.h"
 #include "mt25tl01g.h"
 
-/** @addtogroup STM32H747I_DISCOVERY_QSPI
+/** @addtogroup BSP
   * @{
+  */
+
+/** @addtogroup STM32H747I_DISCO
+  * @{
+  */
+
+/** @addtogroup STM32H747I_DISCO_QSPI
+  * @{
+  */
+/* Exported types ------------------------------------------------------------*/
+/** @defgroup STM32H747I_DISCO_QSPI_Exported_Types Exported Types
+  * @{
+  */
+#define BSP_QSPI_Info_t                 MT25TL01G_Info_t
+#define BSP_QSPI_Interface_t            MT25TL01G_Interface_t
+#define BSP_QSPI_Transfer_t             MT25TL01G_Transfer_t
+#define BSP_QSPI_DualFlash_t            MT25TL01G_DualFlash_t
+#define BSP_QSPI_Erase_t                MT25TL01G_Erase_t
+#define BSP_QSPI_ODS_t                  MT25TL01G_ODS_t
+
+typedef enum
+{
+  QSPI_ACCESS_NONE = 0,          /*!<  Instance not initialized,             */
+  QSPI_ACCESS_INDIRECT,          /*!<  Instance use indirect mode access     */
+  QSPI_ACCESS_MMP                /*!<  Instance use Memory Mapped Mode read  */
+} BSP_QSPI_Access_t;
+
+typedef struct
+{
+  BSP_QSPI_Access_t    IsInitialized;   /*!<  Instance access Flash method     */
+  BSP_QSPI_Interface_t InterfaceMode;   /*!<  Flash Interface mode of Instance */
+  BSP_QSPI_Transfer_t  TransferRate;    /*!<  Flash Transfer mode of Instance  */
+  uint32_t             DualFlashMode;   /*!<  Flash dual mode                  */
+  uint32_t             IsMspCallbacksValid;
+} BSP_QSPI_Ctx_t;
+
+typedef struct
+{
+  BSP_QSPI_Interface_t        InterfaceMode;   /*!<  Current Flash Interface mode */
+  BSP_QSPI_Transfer_t         TransferRate;    /*!<  Current Flash Transfer mode  */
+  BSP_QSPI_DualFlash_t        DualFlashMode;   /*!<  Dual Flash mode              */
+} BSP_QSPI_Init_t;
+
+typedef struct
+{
+  uint32_t FlashSize;
+  uint32_t ClockPrescaler;
+  uint32_t SampleShifting;
+  uint32_t DualFlashMode;
+}MX_QSPI_Init_t;
+#if (USE_HAL_QSPI_REGISTER_CALLBACKS == 1)
+typedef struct
+{
+ void(*pMspInitCb)(pQSPI_CallbackTypeDef);
+ void(*pMspDeInitCb)(pQSPI_CallbackTypeDef);
+}BSP_QSPI_Cb_t;
+#endif /* (USE_HAL_QSPI_REGISTER_CALLBACKS == 1) */
+
+/**
+  * @}
   */
 
 /* Exported constants --------------------------------------------------------*/
-/** @defgroup STM32H747I_DISCOVERY_QSPI_Exported_Constants Exported Constants
+/** @defgroup STM32H747I_DISCO_QSPI_Exported_Constants Exported Constants
   * @{
   */
-/* QSPI Error codes */
-#define QSPI_OK            ((uint8_t)0x00)
-#define QSPI_ERROR         ((uint8_t)0x01)
-#define QSPI_BUSY          ((uint8_t)0x02)
-#define QSPI_NOT_SUPPORTED ((uint8_t)0x04)
-#define QSPI_SUSPENDED     ((uint8_t)0x08)
-#define QSPI_PROTECTED     ((uint8_t)0x10)
+/* QSPI instances number */
+#define QSPI_INSTANCES_NUMBER         1U
+
+/* Definition for QSPI modes */
+#define BSP_QSPI_SPI_MODE            (BSP_QSPI_Interface_t)MT25TL01G_SPI_MODE      /* 1 Cmd Line, 1 Address Line and 1 Data Line    */
+#define BSP_QSPI_SPI_1I2O_MODE       (BSP_QSPI_Interface_t)MT25TL01G_SPI_1I2O_MODE /* 1 Cmd Line, 1 Address Line and 2 Data Lines   */
+#define BSP_QSPI_SPI_2IO_MODE        (BSP_QSPI_Interface_t)MT25TL01G_SPI_2IO_MODE  /* 1 Cmd Line, 2 Address Lines and 2 Data Lines  */
+#define BSP_QSPI_SPI_1I4O_MODE       (BSP_QSPI_Interface_t)MT25TL01G_SPI_1I4O_MODE /* 1 Cmd Line, 1 Address Line and 4 Data Lines   */
+#define BSP_QSPI_SPI_4IO_MODE        (BSP_QSPI_Interface_t)MT25TL01G_SPI_4IO_MODE  /* 1 Cmd Line, 4 Address Lines and 4 Data Lines  */
+#define BSP_QSPI_DPI_MODE            (BSP_QSPI_Interface_t)MT25TL01G_DPI_MODE      /* 2 Cmd Lines, 2 Address Lines and 2 Data Lines */
+#define BSP_QSPI_QPI_MODE            (BSP_QSPI_Interface_t)MT25TL01G_QPI_MODE      /* 4 Cmd Lines, 4 Address Lines and 4 Data Lines */
+
+/* Definition for QSPI transfer rates */
+#define BSP_QSPI_STR_TRANSFER        (BSP_QSPI_Transfer_t)MT25TL01G_STR_TRANSFER /* Single Transfer Rate */
+#define BSP_QSPI_DTR_TRANSFER        (BSP_QSPI_Transfer_t)MT25TL01G_DTR_TRANSFER /* Double Transfer Rate */
+
+/* Definition for QSPI dual flash mode */
+#define BSP_QSPI_DUALFLASH_DISABLE   (BSP_QSPI_DualFlash_t)MT25TL01G_DUALFLASH_DISABLE   /* Dual flash mode enabled  */
+/* Definition for QSPI Flash ID */
+#define BSP_QSPI_FLASH_ID            QSPI_FLASH_ID_1
+
+/* QSPI erase types */
+#define BSP_QSPI_ERASE_4K            (MT25TL01G_Erase_t)MT25TL01G_ERASE_4K
+#define BSP_QSPI_ERASE_32K           (MT25TL01G_Erase_t)MT25TL01G_ERASE_32K
+#define BSP_QSPI_ERASE_64K           (MT25TL01G_Erase_t)MT25TL01G_ERASE_64K
+#define BSP_QSPI_ERASE_CHIP          (MT25TL01G_Erase_t)MT25TL01G_ERASE_CHIP
+
+/* QSPI block sizes */
+#define BSP_QSPI_BLOCK_4K            MT25TL01G_SECTOR_4K
+#define BSP_QSPI_BLOCK_32K           MT25TL01G_BLOCK_32K
+#define BSP_QSPI_BLOCK_64K           MT25TL01G_BLOCK_64K
 
 /* Definition for QSPI clock resources */
 #define QSPI_CLK_ENABLE()              __HAL_RCC_QSPI_CLK_ENABLE()
@@ -113,42 +189,39 @@
   * @}
   */
 
-/* Exported types ------------------------------------------------------------*/
-/** @defgroup STM32H747I_DISCOVERY_QSPI_Exported_Types Exported Types
+/** @addtogroup STM32H747I_DISCO_QSPI_Exported_Variables
   * @{
   */
-/* QSPI Info */
-typedef struct {
-  uint32_t FlashSize;          /*!< Size of the flash */
-  uint32_t EraseSectorSize;    /*!< Size of sectors for the erase operation */
-  uint32_t EraseSectorsNumber; /*!< Number of sectors for the erase operation */
-  uint32_t ProgPageSize;       /*!< Size of pages for the program operation */
-  uint32_t ProgPagesNumber;    /*!< Number of pages for the program operation */
-} QSPI_Info;
-
+extern QSPI_HandleTypeDef hqspi;
+extern BSP_QSPI_Ctx_t     QSPI_Ctx[];
 /**
   * @}
   */
 
-
 /* Exported functions --------------------------------------------------------*/
-/** @addtogroup STM32H747I_DISCOVERY_QSPI_Exported_Functions
+/** @addtogroup STM32H747I_DISCO_QSPI_Exported_Functions
   * @{
   */
-uint8_t BSP_QSPI_Init       (void);
-uint8_t BSP_QSPI_DeInit     (void);
-uint8_t BSP_QSPI_Read       (uint8_t* pData, uint32_t ReadAddr, uint32_t Size);
-uint8_t BSP_QSPI_Write      (uint8_t* pData, uint32_t WriteAddr, uint32_t Size);
-uint8_t BSP_QSPI_Erase_Block(uint32_t BlockAddress);
-uint8_t BSP_QSPI_Erase_Chip (void);
-uint8_t BSP_QSPI_GetStatus  (void);
-uint8_t BSP_QSPI_GetInfo    (QSPI_Info* pInfo);
-uint8_t BSP_QSPI_EnableMemoryMappedMode(void);
+int32_t BSP_QSPI_Init(uint32_t Instance, BSP_QSPI_Init_t *Init);
+int32_t BSP_QSPI_DeInit(uint32_t Instance);
+#if (USE_HAL_QSPI_REGISTER_CALLBACKS == 1)
+int32_t BSP_QSPI_RegisterMspCallbacks (uint32_t Instance, BSP_QSPI_Cb_t *CallBacks);
+int32_t BSP_QSPI_RegisterDefaultMspCallbacks (uint32_t Instance);
+#endif /* (USE_HAL_QSPI_REGISTER_CALLBACKS == 1) */
+int32_t BSP_QSPI_Read(uint32_t Instance, uint8_t *pData, uint32_t ReadAddr, uint32_t Size);
+int32_t BSP_QSPI_Write(uint32_t Instance, uint8_t *pData, uint32_t WriteAddr, uint32_t Size);
+int32_t BSP_QSPI_EraseBlock(uint32_t Instance, uint32_t BlockAddress, BSP_QSPI_Erase_t BlockSize);
+int32_t BSP_QSPI_EraseChip(uint32_t Instance);
+int32_t BSP_QSPI_GetStatus(uint32_t Instance);
+int32_t BSP_QSPI_GetInfo(uint32_t Instance, BSP_QSPI_Info_t *pInfo);
+int32_t BSP_QSPI_EnableMemoryMappedMode(uint32_t Instance);
+int32_t BSP_QSPI_DisableMemoryMappedMode(uint32_t Instance);
+int32_t BSP_QSPI_ReadID(uint32_t Instance, uint8_t *Id);
+int32_t BSP_QSPI_ConfigFlash(uint32_t Instance, BSP_QSPI_Interface_t Mode, BSP_QSPI_Transfer_t Rate);
 
 /* These functions can be modified in case the current settings
    need to be changed for specific application needs */
-void BSP_QSPI_MspInit(QSPI_HandleTypeDef *hqspi, void *Params);
-void BSP_QSPI_MspDeInit(QSPI_HandleTypeDef *hqspi, void *Params);
+HAL_StatusTypeDef MX_QSPI_Init(QSPI_HandleTypeDef *hQspi, MX_QSPI_Init_t *Config);
 
 /**
   * @}
@@ -158,17 +231,17 @@ void BSP_QSPI_MspDeInit(QSPI_HandleTypeDef *hqspi, void *Params);
   * @}
   */
 
+/**
+  * @}
+  */
+
+/**
+  * @}
+  */
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __STM32H747I_DISCOVERY_QSPI_H */
-/**
-  * @}
-  */
-
-/**
-  * @}
-  */
+#endif /*STM32H747I_DISCO_QSPI_H */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

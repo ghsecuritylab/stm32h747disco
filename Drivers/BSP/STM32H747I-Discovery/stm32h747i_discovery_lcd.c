@@ -3,11 +3,11 @@
   * @file    stm32h747i_discovery_lcd.c
   * @author  MCD Application Team
   * @brief   This file includes the driver for Liquid Crystal Display (LCD) module
-  *          mounted on STM32H747I_DISCOVERY board.
+  *          mounted on STM32H747I_DISCO board.
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
+  * <h2><center>&copy; Copyright (c) 2017 STMicroelectronics.
   * All rights reserved.</center></h2>
   *
   * This software component is licensed by ST under BSD 3-Clause license,
@@ -17,1715 +17,650 @@
   *
   ******************************************************************************
   */
+/*  How To use this driver:
+  --------------------------
+   - This driver is used to drive directly a LCD TFT using the DSI interface.
+     The following IPs are implied : DSI Host IP block working in conjunction to the
+	 LTDC controller.
+   - This driver is linked by construction to LCD KoD mounted on MB1166 daughter board.
+   - This driver is also used to drive monitors using HDMI interface.
 
-/* File Info: ------------------------------------------------------------------
-                                   User NOTES
-1. How To use this driver:
---------------------------
-   - This driver is used to drive directly in video mode a LCD TFT using the DSI interface.
-     The following IPs are implied : DSI Host IP block working
-     in conjunction to the LTDC controller.
-   - This driver is linked by construction to LCD KoD mounted on board MB1166.
+  Driver description:
+  ---------------------
+   + Initialization steps:
+     o Initialize the LCD in default mode using the BSP_LCD_Init() function with the
+       following settings:
+        - DSI is configured in video mode
+        - Pixelformat : LCD_PIXEL_FORMAT_RBG888
+        - Orientation : LCD_ORIENTATION_LANDSCAPE.
+        - Width       : LCD_DEFAULT_WIDTH (800)
+        - Height      : LCD_DEFAULT_HEIGHT(480)
+       The default LTDC layer configured is layer 0.
+       BSP_LCD_Init() includes DSI, LTDC, LTDC Layer and clock configurations by calling:
+        - MX_LTDC_ClockConfig()
+        - MX_LTDC_Init()
+        - MX_DSIHOST_DSI_Init()
+        - MX_LTDC_ConfigLayer()
 
-2. Driver description:
----------------------
-  + Initialization steps:
-     o Initialize the LCD using the BSP_LCD_Init() function.
+     o Initialize the LCD with required parameters using the BSP_LCD_InitEx() function.
+       To initialize DSI in command mode, user have to override MX_DSIHOST_DSI_Init(), weak function,
+       content at application level.
+
+     o Initialize the display with HDMI using BSP_LCD_InitHDMI(). Two display formats
+       are supported: HDMI_FORMAT_720_480 or HDMI_FORMAT_720_576
+
      o Select the LCD layer to be used using the BSP_LCD_SelectLayer() function.
      o Enable the LCD display using the BSP_LCD_DisplayOn() function.
+     o Disable the LCD display using the BSP_LCD_DisplayOff() function.
+     o Set the display brightness using the BSP_LCD_SetBrightness() function.
+     o Get the display brightness using the BSP_LCD_GetBrightness() function.
+     o Write a pixel to the LCD memory using the BSP_LCD_WritePixel() function.
+     o Read a pixel from the LCD memory using the BSP_LCD_ReadPixel() function.
+     o Draw an horizontal line using the BSP_LCD_DrawHLine() function.
+     o Draw a vertical line using the BSP_LCD_DrawVLine() function.
+     o Draw a bitmap image using the BSP_LCD_DrawBitmap() function.
 
-  + Options
+   + Options
+     o Configure the LTDC reload mode by calling BSP_LCD_Relaod(). By default, the
+       reload mode is set to BSP_LCD_RELOAD_IMMEDIATE then LTDC is reloaded immediately.
+       To control the reload mode:
+         - Call BSP_LCD_Relaod() with ReloadType parameter set to BSP_LCD_RELOAD_NONE
+         - Configure LTDC (color keying, transparency ..)
+         - Call BSP_LCD_Relaod() with ReloadType parameter set to BSP_LCD_RELOAD_IMMEDIATE
+           for immediate reload or BSP_LCD_RELOAD_VERTICAL_BLANKING for LTDC reload
+           in the next vertical blanking
+     o Configure LTDC layers using BSP_LCD_ConfigLayer()
+     o Control layer visibility using BSP_LCD_SetLayerVisible()
      o Configure and enable the color keying functionality using the
        BSP_LCD_SetColorKeying() function.
-     o Modify in the fly the transparency and/or the frame buffer address
+     o Disable the color keying functionality using the BSP_LCD_ResetColorKeying() function.
+     o Modify on the fly the transparency and/or the frame buffer address
        using the following functions:
        - BSP_LCD_SetTransparency()
        - BSP_LCD_SetLayerAddress()
 
-  + Display on LCD
-     o Clear the whole LCD using BSP_LCD_Clear() function or only one specified string
-       line using the BSP_LCD_ClearStringLine() function.
-     o Display a character on the specified line and column using the BSP_LCD_DisplayChar()
-       function or a complete string line using the BSP_LCD_DisplayStringAtLine() function.
-     o Display a string line on the specified position (x,y in pixel) and align mode
-       using the BSP_LCD_DisplayStringAtLine() function.
-     o Draw and fill a basic shapes (dot, line, rectangle, circle, ellipse, .. bitmap)
-       on LCD using the available set of functions.
+   + Display on LCD
+     o To draw and fill a basic shapes (dot, line, rectangle, circle, ellipse, .. bitmap)
+       on LCD and display text, utility basic_gui.c/.h must be called. Once the LCD is initialized,
+       user should call GUI_SetFuncDriver() API to link board LCD drivers to BASIC GUI LCD drivers.
+       The basic gui services, defined in basic_gui utility, are ready for use.
 
-------------------------------------------------------------------------------*/
+  Note:
+  --------
+    Regarding the "Instance" parameter, needed for all functions, it is used to select
+    an LCD instance. On the STM32H747I_DISCO board, there's one instance. Then, this
+    parameter should be 0.
+  */
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32h747i_discovery_lcd.h"
-#include "Fonts/fonts.h"
-#include "Fonts/font24.c"
-#include "Fonts/font20.c"
-#include "Fonts/font16.c"
-#include "Fonts/font12.c"
-#include "Fonts/font8.c"
-
+#include "stm32h747i_discovery_bus.h"
+#include "stm32h747i_discovery_sdram.h"
 /** @addtogroup BSP
   * @{
   */
 
-/** @addtogroup STM32H747I_DISCOVERY
+/** @addtogroup STM32H747I_DISCO
   * @{
   */
 
-/** @defgroup STM32H747I_DISCOVERY_LCD STM32H747I_DISCOVERY_LCD
+/** @defgroup STM32H747I_DISCO_LCD LCD
   * @{
   */
-
-/** @defgroup STM32H747I_DISCOVERY_LCD_Private_Defines Private Defines
+/** @defgroup STM32H747I_DISCO_LCD_Private_Variables Private Variables
   * @{
   */
-
-#if defined(USE_LCD_HDMI)
-#define HDMI_ASPECT_RATIO_16_9  ADV7533_ASPECT_RATIO_16_9
-#define HDMI_ASPECT_RATIO_4_3   ADV7533_ASPECT_RATIO_4_3
-#endif /* USE_LCD_HDMI */
-#define LCD_DSI_ID              0x11
-#define LCD_DSI_ID_REG          0xA8
+static LCD_Drv_t                *Lcd_Drv = NULL;
 /**
   * @}
   */
 
-/** @defgroup STM32H747I_DISCOVERY_LCD_Private_Types Private Types
+/** @defgroup STM32H747I_DISCO_LCD_Private_TypesDefinitions Private TypesDefinitions
   * @{
   */
-
-#if defined(USE_LCD_HDMI)
-/**
-  * @brief  DSI timming params used for different HDMI adpater
-  */
-typedef struct
+const GUI_Drv_t LCD_Driver =
 {
-  uint16_t      HACT;
-  uint16_t      HSYNC;
-  uint16_t      HBP;
-  uint16_t      HFP;
-  uint16_t      VACT;
-  uint16_t      VSYNC;
-  uint16_t      VBP;
-  uint16_t      VFP;
-  uint8_t       ASPECT_RATIO;
-  uint8_t       RGB_CODING;
-} HDMI_FormatTypeDef;
-
-/**
-  * @brief  DSI packet params used for different HDMI adpater
-  */
-typedef struct
-{
-  uint16_t      NullPacketSize;
-  uint16_t      NumberOfChunks;
-  uint16_t      PacketSize;
-} HDMI_DSIPacketTypeDef;
-
-/**
-  * @brief  LTDC PLL params used for different HDMI adpater
-  */
-typedef struct
-{
-  uint16_t      PLL_LTDC_N;
-  uint16_t      PLL_LTDC_R;
-  uint32_t      PCLK;
-  uint16_t      IDF;
-  uint16_t      NDIV;
-  uint16_t      ODF;
-  uint16_t      LaneByteClock;
-  uint16_t      TXEscapeCkdiv;
-} HDMI_PLLConfigTypeDef;
-
-#endif /* USE_LCD_HDMI */
-/**
-  * @}
-  */
-
-/** @defgroup STM32H747I_DISCOVERY_LCD_Private_Macros Private Macros
-  * @{
-  */
-#define ABS(X)                 ((X) > 0 ? (X) : -(X))
-#define POLY_X(Z)              ((int32_t)((Points + (Z))->X))
-#define POLY_Y(Z)              ((int32_t)((Points + (Z))->Y))
-/**
-  * @}
-  */
-
-/** @defgroup STM32H747I_DISCOVERY_LCD_Exported_Variables Exported Variables
-  * @{
-  */
-DMA2D_HandleTypeDef hdma2d_discovery;
-LTDC_HandleTypeDef  hltdc_discovery;
-DSI_HandleTypeDef hdsi_discovery;
-
-/**
-  * @}
-  */
-
-/** @defgroup STM32H747I_DISCOVERY_LCD_Private_Variables Private Variables
-  * @{
-  */
-static DSI_VidCfgTypeDef hdsivideo_handle;
-uint32_t lcd_x_size = OTM8009A_800X480_WIDTH;
-uint32_t lcd_y_size = OTM8009A_800X480_HEIGHT;
-
-#if defined(USE_LCD_HDMI)
-/**
-  * @brief  DSI timming used for different HDMI resolution (720x480 and 720x576)
-  */
-HDMI_FormatTypeDef HDMI_Format[2] =
-{
-/* HA   HS  HB  HF  VA   VS VB  VF  ASPECT                BPP */
-  {720, 62, 60, 30, 480, 6, 19, 9, HDMI_ASPECT_RATIO_4_3, LCD_DSI_PIXEL_DATA_FMT_RBG888},
-  {720, 64, 68, 12, 576, 5, 39, 5, HDMI_ASPECT_RATIO_16_9, LCD_DSI_PIXEL_DATA_FMT_RBG888}
-
+  BSP_LCD_DrawBitmap,
+  BSP_LCD_FillRGBRect,
+  BSP_LCD_DrawHLine,
+  BSP_LCD_DrawVLine,
+  BSP_LCD_FillRect,
+  BSP_LCD_ReadPixel,
+  BSP_LCD_WritePixel,
+  BSP_LCD_GetXSize,
+  BSP_LCD_GetYSize,
+  BSP_LCD_SetActiveLayer,
+  BSP_LCD_GetPixelFormat
 };
 
-/**
-  * @brief  DSI packet size used for different HDMI resolution (720x480 and 720x576)
-  */
-HDMI_DSIPacketTypeDef HDMI_DSIPacket[2] =
+typedef struct
 {
-  /* NP NC VP */
-  {0, 1, 720},
-  {0, 1, 720}
-};
-
-/**
-  * @brief  LTDC PLL settings used for different HDMI resolution (720x480 and 720x576)
-  */
-HDMI_PLLConfigTypeDef HDMI_PLLConfig[4] =
-{
-/* N   DIV Pclk   IDF              NDIV ODF               LBClk TXEscapeCkdiv*/
-  {13, 12, 27083, DSI_PLL_IN_DIV5, 65, DSI_PLL_OUT_DIV1, 40625, 3},
-  {13, 12, 27083, DSI_PLL_IN_DIV5, 65, DSI_PLL_OUT_DIV1, 40625, 3},
-
-};
-#endif /* USE_LCD_HDMI */
-
-/**
-  * @brief  Default Active LTDC Layer in which drawing is made is LTDC Layer Background
-  */
-static uint32_t  ActiveLayer = LTDC_ACTIVE_LAYER_BACKGROUND;
-
-/**
-  * @brief  Current Drawing Layer properties variable
-  */
-static LCD_DrawPropTypeDef DrawProp[LTDC_MAX_LAYER_NUMBER];
-/**
-  * @}
-  */
-
-/** @defgroup STM32H747I_DISCOVERY_LCD_Private_FunctionPrototypes Private FunctionPrototypes
-  * @{
-  */
-static void DrawChar(uint16_t Xpos, uint16_t Ypos, const uint8_t *c);
-static void FillTriangle(uint16_t x1, uint16_t x2, uint16_t x3, uint16_t y1, uint16_t y2, uint16_t y3);
-static void LL_FillBuffer(uint32_t LayerIndex, void *pDst, uint32_t xSize, uint32_t ySize, uint32_t OffLine, uint32_t ColorIndex);
-static void LL_ConvertLineToARGB8888(void * pSrc, void *pDst, uint32_t xSize, uint32_t ColorMode);
-static uint16_t LCD_IO_GetID(void);
-/**
-  * @}
-  */
-
-/** @defgroup STM32H747I_DISCOVERY_LCD_Exported_Functions Exported Functions
-  * @{
-  */
-
-/**
-  * @brief  Initializes the DSI LCD.
-  * @retval LCD state
-  */
-uint8_t BSP_LCD_Init(void)
-{
-  return (BSP_LCD_InitEx(LCD_ORIENTATION_LANDSCAPE));
-}
-
-/**
-  * @brief  Initializes the DSI LCD.
-  * The ititialization is done as below:
-  *     - DSI PLL ititialization
-  *     - DSI ititialization
-  *     - LTDC ititialization
-  *     - OTM8009A LCD Display IC Driver ititialization
-  * @param orientation Display orientation
-  * @retval LCD state
-  */
-uint8_t BSP_LCD_InitEx(LCD_OrientationTypeDef orientation)
-{
-  DSI_PLLInitTypeDef dsiPllInit;
-  DSI_PHY_TimerTypeDef  PhyTimings;
-  static RCC_PeriphCLKInitTypeDef  PeriphClkInitStruct;
-  uint32_t LcdClock  = 26400; /*!< LcdClk = 26400 kHz */
-  uint16_t read_id = 0;
-
-  uint32_t laneByteClk_kHz = 0;
-  uint32_t                   VSA; /*!< Vertical start active time in units of lines */
-  uint32_t                   VBP; /*!< Vertical Back Porch time in units of lines */
-  uint32_t                   VFP; /*!< Vertical Front Porch time in units of lines */
-  uint32_t                   VACT; /*!< Vertical Active time in units of lines = imageSize Y in pixels to display */
-  uint32_t                   HSA; /*!< Horizontal start active time in units of lcdClk */
-  uint32_t                   HBP; /*!< Horizontal Back Porch time in units of lcdClk */
-  uint32_t                   HFP; /*!< Horizontal Front Porch time in units of lcdClk */
-  uint32_t                   HACT; /*!< Horizontal Active time in units of lcdClk = imageSize X in pixels to display */
-
-  /* Toggle Hardware Reset of the DSI LCD using
-  * its XRES signal (active low) */
-  BSP_LCD_Reset();
-
-  /* Check the connected monitor */
-  read_id = LCD_IO_GetID();
-
-#if defined(USE_LCD_HDMI)
-  if(read_id == ADV7533_ID)
-  {
-    return BSP_LCD_HDMIInitEx(HDMI_FORMAT_720_576);
-  }
-  else if(read_id != LCD_DSI_ID)
-  {
-    return LCD_ERROR;
-  }
-#else
-  if(read_id != LCD_DSI_ID)
-  {
-    return LCD_ERROR;
-  }
-#endif /* USE_LCD_HDMI */
-
-  /* Call first MSP Initialize only in case of first initialization
-  * This will set IP blocks LTDC, DSI and DMA2D
-  * - out of reset
-  * - clocked
-  * - NVIC IRQ related to IP blocks enabled
-  */
-  BSP_LCD_MspInit();
-
-/*************************DSI Initialization***********************************/
-
-  /* Base address of DSI Host/Wrapper registers to be set before calling De-Init */
-  hdsi_discovery.Instance = DSI;
-
-  HAL_DSI_DeInit(&(hdsi_discovery));
-
-  dsiPllInit.PLLNDIV  = 100;
-  dsiPllInit.PLLIDF   = DSI_PLL_IN_DIV5;
-  dsiPllInit.PLLODF  = DSI_PLL_OUT_DIV1;
-  laneByteClk_kHz = 62500; /* 500 MHz / 8 = 62.5 MHz = 62500 kHz */
-
-  /* Set number of Lanes */
-  hdsi_discovery.Init.NumberOfLanes = DSI_TWO_DATA_LANES;
-
-  /* TXEscapeCkdiv = f(LaneByteClk)/15.62 = 4 */
-  hdsi_discovery.Init.TXEscapeCkdiv = laneByteClk_kHz/15620;
-
-  HAL_DSI_Init(&(hdsi_discovery), &(dsiPllInit));
-
-  /* Timing parameters for all Video modes
-  * Set Timing parameters of LTDC depending on its chosen orientation
-  */
-  if(orientation == LCD_ORIENTATION_PORTRAIT)
-  {
-    lcd_x_size = OTM8009A_480X800_WIDTH;  /* 480 */
-    lcd_y_size = OTM8009A_480X800_HEIGHT; /* 800 */
-  }
-  else
-  {
-    /* lcd_orientation == LCD_ORIENTATION_LANDSCAPE */
-    lcd_x_size = OTM8009A_800X480_WIDTH;  /* 800 */
-    lcd_y_size = OTM8009A_800X480_HEIGHT; /* 480 */
-  }
-
-  HACT = lcd_x_size;
-  VACT = lcd_y_size;
-
-  /* The following values are same for portrait and landscape orientations */
-  VSA  = OTM8009A_480X800_VSYNC;        /* 10 */
-  VBP  = OTM8009A_480X800_VBP;          /* 15 */
-  VFP  = OTM8009A_480X800_VFP;          /* 16 */
-  HSA  = OTM8009A_480X800_HSYNC;        /* 2 */
-  HBP  = OTM8009A_480X800_HBP;          /* 20 */
-  HFP  = OTM8009A_480X800_HFP;          /* 20 */
-
-
-  hdsivideo_handle.VirtualChannelID = LCD_OTM8009A_ID;
-  hdsivideo_handle.ColorCoding = LCD_DSI_PIXEL_DATA_FMT_RBG888;
-  hdsivideo_handle.VSPolarity = DSI_VSYNC_ACTIVE_HIGH;
-  hdsivideo_handle.HSPolarity = DSI_HSYNC_ACTIVE_HIGH;
-  hdsivideo_handle.DEPolarity = DSI_DATA_ENABLE_ACTIVE_HIGH;
-  hdsivideo_handle.Mode = DSI_VID_MODE_BURST; /* Mode Video burst ie : one LgP per line */
-  hdsivideo_handle.NullPacketSize = 0xFFF;
-  hdsivideo_handle.NumberOfChunks = 0;
-  hdsivideo_handle.PacketSize                = HACT; /* Value depending on display orientation choice portrait/landscape */
-  hdsivideo_handle.HorizontalSyncActive = (HSA * laneByteClk_kHz)/LcdClock;
-  hdsivideo_handle.HorizontalBackPorch = (HBP * laneByteClk_kHz)/LcdClock;
-  hdsivideo_handle.HorizontalLine = ((HACT + HSA + HBP + HFP) * laneByteClk_kHz)/LcdClock; /* Value depending on display orientation choice portrait/landscape */
-  hdsivideo_handle.VerticalSyncActive        = VSA;
-  hdsivideo_handle.VerticalBackPorch         = VBP;
-  hdsivideo_handle.VerticalFrontPorch        = VFP;
-  hdsivideo_handle.VerticalActive            = VACT; /* Value depending on display orientation choice portrait/landscape */
-
-  /* Enable or disable sending LP command while streaming is active in video mode */
-  hdsivideo_handle.LPCommandEnable = DSI_LP_COMMAND_ENABLE; /* Enable sending commands in mode LP (Low Power) */
-
-  /* Largest packet size possible to transmit in LP mode in VSA, VBP, VFP regions */
-  /* Only useful when sending LP packets is allowed while streaming is active in video mode */
-  hdsivideo_handle.LPLargestPacketSize = 16;
-
-  /* Largest packet size possible to transmit in LP mode in HFP region during VACT period */
-  /* Only useful when sending LP packets is allowed while streaming is active in video mode */
-  hdsivideo_handle.LPVACTLargestPacketSize = 0;
-
-
-  /* Specify for each region of the video frame, if the transmission of command in LP mode is allowed in this region */
-  /* while streaming is active in video mode                                                                         */
-  hdsivideo_handle.LPHorizontalFrontPorchEnable = DSI_LP_HFP_ENABLE;   /* Allow sending LP commands during HFP period */
-  hdsivideo_handle.LPHorizontalBackPorchEnable  = DSI_LP_HBP_ENABLE;   /* Allow sending LP commands during HBP period */
-  hdsivideo_handle.LPVerticalActiveEnable = DSI_LP_VACT_ENABLE;  /* Allow sending LP commands during VACT period */
-  hdsivideo_handle.LPVerticalFrontPorchEnable = DSI_LP_VFP_ENABLE;   /* Allow sending LP commands during VFP period */
-  hdsivideo_handle.LPVerticalBackPorchEnable = DSI_LP_VBP_ENABLE;   /* Allow sending LP commands during VBP period */
-  hdsivideo_handle.LPVerticalSyncActiveEnable = DSI_LP_VSYNC_ENABLE; /* Allow sending LP commands during VSync = VSA period */
-
-  /* Configure DSI Video mode timings with settings set above */
-  HAL_DSI_ConfigVideoMode(&(hdsi_discovery), &(hdsivideo_handle));
-
-  /* Configure DSI PHY HS2LP and LP2HS timings */
-  PhyTimings.ClockLaneHS2LPTime = 35;
-  PhyTimings.ClockLaneLP2HSTime = 35;
-  PhyTimings.DataLaneHS2LPTime = 35;
-  PhyTimings.DataLaneLP2HSTime = 35;
-  PhyTimings.DataLaneMaxReadTime = 0;
-  PhyTimings.StopWaitTime = 10;
-  HAL_DSI_ConfigPhyTimer(&hdsi_discovery, &PhyTimings);
-
-/*************************End DSI Initialization*******************************/
-
-
-/************************LTDC Initialization***********************************/
-
-  /* Timing Configuration */
-  hltdc_discovery.Init.HorizontalSync = (HSA - 1);
-  hltdc_discovery.Init.AccumulatedHBP = (HSA + HBP - 1);
-  hltdc_discovery.Init.AccumulatedActiveW = (lcd_x_size + HSA + HBP - 1);
-  hltdc_discovery.Init.TotalWidth = (lcd_x_size + HSA + HBP + HFP - 1);
-
-  /* Initialize the LCD pixel width and pixel height */
-  hltdc_discovery.LayerCfg->ImageWidth  = lcd_x_size;
-  hltdc_discovery.LayerCfg->ImageHeight = lcd_y_size;
-
-
-  /* LCD clock configuration */
-  /* PLL3_VCO Input = HSE_VALUE/PLL3M = 5 Mhz */
-  /* PLL3_VCO Output = PLL3_VCO Input * PLL3N = 480 Mhz */
-  /* PLLLCDCLK = PLL3_VCO Output/PLL3R = 480/18 = 26.666 Mhz */
-  /* LTDC clock frequency = PLLLCDCLK = 26.666 Mhz */
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_LTDC;
-  PeriphClkInitStruct.PLL3.PLL3M = 5;
-  PeriphClkInitStruct.PLL3.PLL3N = 96;
-  PeriphClkInitStruct.PLL3.PLL3P = 2;
-  PeriphClkInitStruct.PLL3.PLL3Q = 10;
-  PeriphClkInitStruct.PLL3.PLL3R = 18;
-  HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
-
-  /* Background value */
-  hltdc_discovery.Init.Backcolor.Blue = 0;
-  hltdc_discovery.Init.Backcolor.Green = 0;
-  hltdc_discovery.Init.Backcolor.Red = 0;
-  hltdc_discovery.Init.PCPolarity = LTDC_PCPOLARITY_IPC;
-  hltdc_discovery.Instance = LTDC;
-
-  /* Get LTDC Configuration from DSI Configuration */
-  HAL_LTDC_StructInitFromVideoConfig(&(hltdc_discovery), &(hdsivideo_handle));
-
-  /* Initialize the LTDC */
-  HAL_LTDC_Init(&hltdc_discovery);
-
-  /* Enable the DSI host and wrapper : after LTDC */
-  /* To avoid any synchronization issue, the DSI shall be started after enabling the LTDC */
-  HAL_DSI_Start(&hdsi_discovery);
-
-#if !defined(DATA_IN_ExtSDRAM)
-  /* Initialize the SDRAM */
-  BSP_SDRAM_Init();
-#endif /* DATA_IN_ExtSDRAM */
-
-  /* Initialize the font */
-  BSP_LCD_SetFont(&LCD_DEFAULT_FONT);
-
-/************************End LTDC Initialization*******************************/
-
-
-/***********************OTM8009A Initialization********************************/
-
-  /* Initialize the OTM8009A LCD Display IC Driver (KoD LCD IC Driver)
-  *  depending on configuration set in 'hdsivideo_handle'.
-  */
-  OTM8009A_Init(OTM8009A_FORMAT_RGB888, orientation);
-
-/***********************End OTM8009A Initialization****************************/
-
-  return LCD_OK;
-}
-
-#if defined(USE_LCD_HDMI)
-/**
-  * @brief  Initializes the DSI for HDMI monitor.
-  * The ititialization is done as below:
-  *     - DSI PLL ititialization
-  *     - DSI ititialization
-  *     - LTDC ititialization
-  *     - DSI-HDMI ADV7533 adapter device ititialization
-  * @param  format : HDMI format could be HDMI_FORMAT_720_480 or HDMI_FORMAT_720_576
-  * @retval LCD state
-  */
-uint8_t BSP_LCD_HDMIInitEx(uint8_t format)
-{
-  /************************ADV7533 Initialization******************************/
-
-  /* Initialize the ADV7533 HDMI Bridge
-     depending on configuration set in 'hdsivideo_handle'. */
-  adv7533ConfigTypeDef adv7533_config;
-
-  adv7533_config.DSI_LANES = 2;
-  adv7533_config.HACT = HDMI_Format[format].HACT;
-  adv7533_config.HSYNC = HDMI_Format[format].HSYNC;
-  adv7533_config.HBP = HDMI_Format[format].HBP;
-  adv7533_config.HFP = HDMI_Format[format].HFP;
-  adv7533_config.VACT = HDMI_Format[format].VACT;
-  adv7533_config.VSYNC = HDMI_Format[format].VSYNC;
-  adv7533_config.VBP = HDMI_Format[format].VBP;
-  adv7533_config.VFP = HDMI_Format[format].VFP;
-
-  ADV7533_Init();
-  ADV7533_Configure(&adv7533_config);
-  ADV7533_PowerOn();
-
-/************************ Update hdmi_x_size and hdmi_y_size *****************/
-  lcd_x_size = HDMI_Format[format].HACT;
-  lcd_y_size = HDMI_Format[format].VACT;
-
-/***********************End ADV7533 Initialization****************************/
-
-  DSI_PLLInitTypeDef dsiPllInit;
-  DSI_PHY_TimerTypeDef dsiPhyInit;
-  static RCC_PeriphCLKInitTypeDef  PeriphClkInitStruct;
-
-  /* Call first MSP Initialize only in case of first initialization
-  * This will set IP blocks LTDC and DSI
-  * - out of reset
-  * - clocked
-  * - NVIC IRQ related to IP blocks enabled
-  */
-  BSP_LCD_MspInit();
-
-/*************************DSI Initialization***********************************/
-
-  /* Base address of DSI Host/Wrapper registers to be set before calling De-Init */
-  hdsi_discovery.Instance = DSI;
-
-  HAL_DSI_DeInit(&(hdsi_discovery));
-
-  /* Configure the DSI PLL */
-  dsiPllInit.PLLNDIV    = HDMI_PLLConfig[format].NDIV;
-  dsiPllInit.PLLIDF     = HDMI_PLLConfig[format].IDF;
-  dsiPllInit.PLLODF     = HDMI_PLLConfig[format].ODF;
-
-  /* Set number of Lanes */
-  hdsi_discovery.Init.NumberOfLanes = DSI_TWO_DATA_LANES;
-  /* Set the TX escape clock division ratio */
-  hdsi_discovery.Init.TXEscapeCkdiv = HDMI_PLLConfig[format].TXEscapeCkdiv;
-  /* Disable the automatic clock lane control (the ADV7533 must be clocked) */
-  hdsi_discovery.Init.AutomaticClockLaneControl = DSI_AUTO_CLK_LANE_CTRL_DISABLE;
-
-  /* Init the DSI */
-  HAL_DSI_Init(&hdsi_discovery, &dsiPllInit);
+  uint32_t      HACT;
+  uint32_t      VACT;
+  uint32_t      HSYNC;
+  uint32_t      HBP;
+  uint32_t      HFP;
+  uint32_t      VSYNC;
+  uint32_t      VBP;
+  uint32_t      VFP;
 
   /* Configure the D-PHY Timings */
-  dsiPhyInit.ClockLaneHS2LPTime = 0x14;
-  dsiPhyInit.ClockLaneLP2HSTime = 0x14;
-  dsiPhyInit.DataLaneHS2LPTime = 0x0A;
-  dsiPhyInit.DataLaneLP2HSTime = 0x0A;
-  dsiPhyInit.DataLaneMaxReadTime = 0x00;
-  dsiPhyInit.StopWaitTime = 0x0;
-  HAL_DSI_ConfigPhyTimer(&hdsi_discovery, &dsiPhyInit);
+  uint32_t      ClockLaneHS2LPTime;
+  uint32_t      ClockLaneLP2HSTime;
+  uint32_t      DataLaneHS2LPTime;
+  uint32_t      DataLaneLP2HSTime;
+  uint32_t      DataLaneMaxReadTime;
+  uint32_t      StopWaitTime;
+} LCD_HDMI_Timing_t;
+/**
+  * @}
+  */
 
-  /* Virutal channel used by the ADV7533 */
-  hdsivideo_handle.VirtualChannelID     = HDMI_ADV7533_ID;
+/** @defgroup STM32H747I_DISCO_LCD_Exported_Variables Exported Variables
+  * @{
+  */
+void                *Lcd_CompObj = NULL;
+DSI_HandleTypeDef   hlcd_dsi;
+DMA2D_HandleTypeDef hlcd_dma2d;
+LTDC_HandleTypeDef  hlcd_ltdc;
+BSP_LCD_Ctx_t       Lcd_Ctx[LCD_INSTANCES_NBR];
+/**
+  * @}
+  */
 
-  /* Timing parameters for Video modes
-     Set Timing parameters of DSI depending on its chosen format */
-  hdsivideo_handle.ColorCoding          = HDMI_Format[format].RGB_CODING;
-  hdsivideo_handle.LooselyPacked        = DSI_LOOSELY_PACKED_DISABLE;
-  hdsivideo_handle.VSPolarity           = DSI_VSYNC_ACTIVE_LOW;
-  hdsivideo_handle.HSPolarity           = DSI_HSYNC_ACTIVE_LOW;
-  hdsivideo_handle.DEPolarity           = DSI_DATA_ENABLE_ACTIVE_HIGH;
-  hdsivideo_handle.Mode                 = DSI_VID_MODE_NB_PULSES;
-  hdsivideo_handle.NullPacketSize       = HDMI_DSIPacket[format].NullPacketSize;
-  hdsivideo_handle.NumberOfChunks       = HDMI_DSIPacket[format].NumberOfChunks;
-  hdsivideo_handle.PacketSize           = HDMI_DSIPacket[format].PacketSize;
-  hdsivideo_handle.HorizontalSyncActive = HDMI_Format[format].HSYNC*HDMI_PLLConfig[format].LaneByteClock/HDMI_PLLConfig[format].PCLK;
-  hdsivideo_handle.HorizontalBackPorch  = HDMI_Format[format].HBP*HDMI_PLLConfig[format].LaneByteClock/HDMI_PLLConfig[format].PCLK;
-  hdsivideo_handle.HorizontalLine       = (HDMI_Format[format].HACT + HDMI_Format[format].HSYNC + HDMI_Format[format].HBP + HDMI_Format[format].HFP)*HDMI_PLLConfig[format].LaneByteClock/HDMI_PLLConfig[format].PCLK;
-  hdsivideo_handle.VerticalSyncActive   = HDMI_Format[format].VSYNC;
-  hdsivideo_handle.VerticalBackPorch    = HDMI_Format[format].VBP;
-  hdsivideo_handle.VerticalFrontPorch   = HDMI_Format[format].VFP;
-  hdsivideo_handle.VerticalActive       = HDMI_Format[format].VACT;
+/** @defgroup STM32H747I_DISCO_LCD_Private_FunctionPrototypes Private FunctionPrototypes
+  * @{
+  */
+static void DSI_MspInit(DSI_HandleTypeDef *hdsi);
+static void DSI_MspDeInit(DSI_HandleTypeDef *hdsi);
+static int32_t DSI_IO_Write(uint16_t ChannelNbr, uint16_t Reg, uint8_t *pData, uint16_t Size);
+static int32_t DSI_IO_Read(uint16_t ChannelNbr, uint16_t Reg, uint8_t *pData, uint16_t Size);
 
-  /* Enable or disable sending LP command while streaming is active in video mode */
-  hdsivideo_handle.LPCommandEnable      = DSI_LP_COMMAND_DISABLE; /* Enable sending commands in mode LP (Low Power) */
+#if (USE_LCD_CTRL_OTM8009A > 0)
+static int32_t OTM8009A_Probe(uint32_t ColorCoding, uint32_t Orientation);
+# endif /* USE_LCD_CTRL_OTM8009A > 0 */
 
-  /* Largest packet size possible to transmit in LP mode in VSA, VBP, VFP regions */
-  /* Only useful when sending LP packets is allowed while streaming is active in video mode */
-  hdsivideo_handle.LPLargestPacketSize          = 4;
+#if (USE_LCD_CTRL_ADV7533 > 0)
+static int32_t ADV7533_Probe(void);
+static void LCD_Get_HDMI_VideoModeTiming(uint32_t Format, LCD_HDMI_Timing_t *Timing);
+static void LTDC_HDMI_Init(LCD_HDMI_Timing_t *Timing);
+#endif /* (USE_LCD_CTRL_ADV7533 > 0) */
 
-  /* Largest packet size possible to transmit in LP mode in HFP region during VACT period */
-  /* Only useful when sending LP packets is allowed while streaming is active in video mode */
-  hdsivideo_handle.LPVACTLargestPacketSize      = 4;
+static void LTDC_MspInit(LTDC_HandleTypeDef *hltdc);
+static void LTDC_MspDeInit(LTDC_HandleTypeDef *hltdc);
+static void DMA2D_MspInit(DMA2D_HandleTypeDef *hdma2d);
+static void DMA2D_MspDeInit(DMA2D_HandleTypeDef *hdma2d);
+static void LL_FillBuffer(uint32_t Instance, uint32_t *pDst, uint32_t xSize, uint32_t ySize, uint32_t OffLine, uint32_t Color);
+static void LL_ConvertLineToRGB(uint32_t Instance, uint32_t *pSrc, uint32_t *pDst, uint32_t xSize, uint32_t ColorMode);
+static void LCD_InitSequence(void);
+static void LCD_DeInitSequence(void);
+/**
+  * @}
+  */
+/** @defgroup STM32H747I_DISCO_LCD_Private_Macros Private Macros
+  * @{
+  */
+#define CONVERTRGB5652ARGB8888(Color)((((((((Color) >> (11U)) & 0x1FU) * 527U) + 23U) >> (6U)) << (16U)) |\
+                                     (((((((Color) >> (5U)) & 0x3FU) * 259U) + 33U) >> (6U)) << (8U)) |\
+                                     (((((Color) & 0x1FU) * 527U) + 23U) >> (6U)) | (0xFF000000U))
 
-  /* Specify for each region, if the going in LP mode is allowed */
-  /* while streaming is active in video mode                     */
-  hdsivideo_handle.LPHorizontalFrontPorchEnable = DSI_LP_HFP_DISABLE;
-  hdsivideo_handle.LPHorizontalBackPorchEnable  = DSI_LP_HBP_DISABLE;
-  hdsivideo_handle.LPVerticalActiveEnable       = DSI_LP_VACT_DISABLE;
-  hdsivideo_handle.LPVerticalFrontPorchEnable   = DSI_LP_VFP_DISABLE;
-  hdsivideo_handle.LPVerticalBackPorchEnable    = DSI_LP_VBP_DISABLE;
-  hdsivideo_handle.LPVerticalSyncActiveEnable   = DSI_LP_VSYNC_DISABLE;
+/**
+  * @}
+  */
+/** @defgroup STM32H747I_DISCO_LCD_Exported_Functions LCD Exported Functions
+  * @{
+  */
+/**
+  * @brief  Initializes the LCD in default mode.
+  * @param  Instance    LCD Instance
+  * @param  Orientation LCD_ORIENTATION_PORTRAIT or LCD_ORIENTATION_LANDSCAPE
+  * @retval BSP status
+  */
+int32_t BSP_LCD_Init(uint32_t Instance, uint32_t Orientation)
+{
+  return BSP_LCD_InitEx(Instance, Orientation, LCD_PIXEL_FORMAT_RGB888, LCD_DEFAULT_WIDTH, LCD_DEFAULT_HEIGHT);
+}
 
-  /* No acknoledge at the end of a frame */
-  hdsivideo_handle.FrameBTAAcknowledgeEnable    = DSI_FBTAA_DISABLE;
+/**
+  * @brief  Initializes the LCD.
+  * @param  Instance    LCD Instance
+  * @param  Orientation LCD_ORIENTATION_PORTRAIT or LCD_ORIENTATION_LANDSCAPE
+  * @param  PixelFormat LCD_PIXEL_FORMAT_RBG565 or LCD_PIXEL_FORMAT_RBG888
+  * @param  Width       Display width
+  * @param  Height      Display height
+  * @retval BSP status
+  */
+int32_t BSP_LCD_InitEx(uint32_t Instance, uint32_t Orientation, uint32_t PixelFormat, uint32_t Width, uint32_t Height)
+{
+  int32_t ret = BSP_ERROR_NONE;
+  uint32_t ctrl_pixel_format, ltdc_pixel_format, dsi_pixel_format;
+  MX_LTDC_LayerConfig_t config;
 
-  /* Configure DSI Video mode timings with settings set above */
-  HAL_DSI_ConfigVideoMode(&hdsi_discovery, &hdsivideo_handle);
+  if((Orientation > LCD_ORIENTATION_LANDSCAPE) || (Instance >= LCD_INSTANCES_NBR) || \
+     ((PixelFormat != LCD_PIXEL_FORMAT_RGB565) && (PixelFormat != LTDC_PIXEL_FORMAT_RGB888)))
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(PixelFormat == LCD_PIXEL_FORMAT_RGB565)
+    {
+      ltdc_pixel_format = LTDC_PIXEL_FORMAT_RGB565;
+      dsi_pixel_format = DSI_RGB565;
+      ctrl_pixel_format = OTM8009A_FORMAT_RBG565;
+      Lcd_Ctx[Instance].BppFactor = 2U;
+    }
+    else /* LCD_PIXEL_FORMAT_RGB888 */
+    {
+      ltdc_pixel_format = LTDC_PIXEL_FORMAT_ARGB8888;
+      dsi_pixel_format = DSI_RGB888;
+      ctrl_pixel_format = OTM8009A_FORMAT_RGB888;
+      Lcd_Ctx[Instance].BppFactor = 4U;
+    }
 
-  /* Enable the DSI host and wrapper : but LTDC is not started yet at this stage */
-  HAL_DSI_Start(&hdsi_discovery);
+    /* Store pixel format, xsize and ysize information */
+    Lcd_Ctx[Instance].PixelFormat = PixelFormat;
+    Lcd_Ctx[Instance].XSize  = Width;
+    Lcd_Ctx[Instance].YSize  = Height;
 
-/*************************End DSI Initialization*******************************/
+    /* Toggle Hardware Reset of the LCD using its XRES signal (active low) */
+    BSP_LCD_Reset(Instance);
 
 
-/************************LTDC Initialization***********************************/
+    /* Initialize LCD special pins GPIOs */
+    LCD_InitSequence();
 
-  /* LCD clock configuration */
-  /* LCD clock configuration */
-  /* PLL3_VCO Input = HSE_VALUE/PLL3M = 25 Mhz */
-  /* PLL3_VCO Output = PLL3_VCO Input * PLL3N */
-  /* PLLLCDCLK = PLL3_VCO Output/PLL3R */
-  /* LTDC clock frequency = PLLLCDCLK */
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_LTDC;
-  PeriphClkInitStruct.PLL3.PLL3M = 1;
-  PeriphClkInitStruct.PLL3.PLL3N = HDMI_PLLConfig[format].PLL_LTDC_N;
-  PeriphClkInitStruct.PLL3.PLL3P = 2;
-  PeriphClkInitStruct.PLL3.PLL3Q = 2;
-  PeriphClkInitStruct.PLL3.PLL3R = HDMI_PLLConfig[format].PLL_LTDC_R;
-  HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
+    /* Initializes peripherals instance value */
+    hlcd_ltdc.Instance = LTDC;
+    hlcd_dma2d.Instance = DMA2D;
+    hlcd_dsi.Instance = DSI;
 
-  /* Base address of LTDC registers to be set before calling De-Init */
-  hltdc_discovery.Instance = LTDC;
+    /* MSP initialization */
+#if (USE_HAL_LTDC_REGISTER_CALLBACKS == 1)
+    /* Register the LTDC MSP Callbacks */
+    if(Lcd_Ctx[Instance].IsMspCallbacksValid == 0U)
+    {
+      if(BSP_LCD_RegisterDefaultMspCallbacks(0) != BSP_ERROR_NONE)
+      {
+        return BSP_ERROR_PERIPH_FAILURE;
+      }
+    }
+#else
+    LTDC_MspInit(&hlcd_ltdc);
+#endif
 
-  HAL_LTDC_DeInit(&(hltdc_discovery));
+    DMA2D_MspInit(&hlcd_dma2d);
 
-  /* Timing Configuration */
-  hltdc_discovery.Init.HorizontalSync = (HDMI_Format[format].HSYNC - 1);
-  hltdc_discovery.Init.AccumulatedHBP = (HDMI_Format[format].HSYNC + HDMI_Format[format].HBP - 1);
-  hltdc_discovery.Init.AccumulatedActiveW = (HDMI_Format[format].HACT + HDMI_Format[format].HSYNC + HDMI_Format[format].HBP - 1);
-  hltdc_discovery.Init.TotalWidth = (HDMI_Format[format].HACT + HDMI_Format[format].HSYNC + HDMI_Format[format].HBP + HDMI_Format[format].HFP - 1);
-  hltdc_discovery.Init.VerticalSync = (HDMI_Format[format].VSYNC - 1);
-  hltdc_discovery.Init.AccumulatedVBP = (HDMI_Format[format].VSYNC + HDMI_Format[format].VBP - 1);
-  hltdc_discovery.Init.AccumulatedActiveH = (HDMI_Format[format].VACT + HDMI_Format[format].VSYNC + HDMI_Format[format].VBP - 1);
-  hltdc_discovery.Init.TotalHeigh = (HDMI_Format[format].VACT + HDMI_Format[format].VSYNC + HDMI_Format[format].VBP + HDMI_Format[format].VFP - 1);
+#if (USE_HAL_DSI_REGISTER_CALLBACKS == 1)
+    /* Register the DSI MSP Callbacks */
+    if(Lcd_Ctx[Instance].IsMspCallbacksValid == 0U)
+    {
+      if(BSP_LCD_RegisterDefaultMspCallbacks(0) != BSP_ERROR_NONE)
+      {
+        return BSP_ERROR_PERIPH_FAILURE;
+      }
+    }
+#else
+    DSI_MspInit(&hlcd_dsi);
+#endif
+    if(MX_DSIHOST_DSI_Init(&hlcd_dsi, Width, Height, dsi_pixel_format) != HAL_OK)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+    else if(MX_LTDC_ClockConfig(&hlcd_ltdc) != HAL_OK)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+    else
+    {
+     if(MX_LTDC_Init(&hlcd_ltdc, Width, Height) != HAL_OK)
+     {
+       ret = BSP_ERROR_PERIPH_FAILURE;
+     }
+    }
 
-  /* background value */
-  hltdc_discovery.Init.Backcolor.Blue = 0x00;
-  hltdc_discovery.Init.Backcolor.Green = 0xFF;
-  hltdc_discovery.Init.Backcolor.Red = 0xFF;
-
-  /* Polarity */
-  hltdc_discovery.Init.HSPolarity = LTDC_HSPOLARITY_AL;
-  hltdc_discovery.Init.VSPolarity = LTDC_VSPOLARITY_AL;
-  hltdc_discovery.Init.DEPolarity = LTDC_DEPOLARITY_AL;
-  hltdc_discovery.Init.PCPolarity = LTDC_PCPOLARITY_IPC;
-
-  /* Initialize & Start the LTDC */
-  HAL_LTDC_Init(&hltdc_discovery);
-
+    if(ret == BSP_ERROR_NONE)
+    {
+      /* Before configuring LTDC layer, ensure SDRAM is initialized */
 #if !defined(DATA_IN_ExtSDRAM)
-  /* Initialize the SDRAM */
-  BSP_SDRAM_Init();
+      /* Initialize the SDRAM */
+      if(BSP_SDRAM_Init(0) != BSP_ERROR_NONE)
+      {
+        return BSP_ERROR_PERIPH_FAILURE;
+      }
 #endif /* DATA_IN_ExtSDRAM */
 
-  /* Initialize the font */
-  BSP_LCD_SetFont(&LCD_DEFAULT_FONT);
-/************************End LTDC Initialization*******************************/
+      /* Configure default LTDC Layer 0. This configuration can be override by calling
+      BSP_LCD_ConfigLayer() at application level */
+      config.X0          = 0;
+      config.X1          = Width;
+      config.Y0          = 0;
+      config.Y1          = Height;
+      config.PixelFormat = ltdc_pixel_format;
+      config.Address     = LCD_LAYER_0_ADDRESS;
+      if(MX_LTDC_ConfigLayer(&hlcd_ltdc, 0, &config) != HAL_OK)
+      {
+        ret = BSP_ERROR_PERIPH_FAILURE;
+      }
+      else
+      {
+        /* Enable the DSI host and wrapper after the LTDC initialization
+        To avoid any synchronization issue, the DSI shall be started after enabling the LTDC */
+        (void)HAL_DSI_Start(&hlcd_dsi);
 
-    return LCD_OK;
-}
-#endif /* USE_LCD_HDMI */
+        /* Enable the DSI BTW for read operations */
+        (void)HAL_DSI_ConfigFlowControl(&hlcd_dsi, DSI_FLOW_CONTROL_BTA);
 
-/**
-  * @brief  BSP LCD Reset
-  *         Hw reset the LCD DSI activating its XRES signal (active low for some time)
-  *         and deactivating it later.
-  * @retval None
-  */
-void BSP_LCD_Reset(void)
-{
-  GPIO_InitTypeDef  gpio_init_structure;
-
-  __HAL_RCC_GPIOG_CLK_ENABLE();
-
-    /* Configure the GPIO on PG3 */
-    gpio_init_structure.Pin   = GPIO_PIN_3;
-    gpio_init_structure.Mode  = GPIO_MODE_OUTPUT_PP;
-    gpio_init_structure.Pull  = GPIO_PULLUP;
-    gpio_init_structure.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-
-    HAL_GPIO_Init(GPIOG, &gpio_init_structure);
-
-    /* Activate XRES active low */
-    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_3, GPIO_PIN_RESET);
-
-    HAL_Delay(20); /* wait 20 ms */
-
-    /* Desactivate XRES */
-    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_3, GPIO_PIN_SET);
-
-    /* Wait for 10ms after releasing XRES before sending commands */
-    HAL_Delay(10);
-}
-
-/**
-  * @brief  Gets the LCD X size.
-  * @retval Used LCD X size
-  */
-uint32_t BSP_LCD_GetXSize(void)
-{
-  return (lcd_x_size);
-}
-
-/**
-  * @brief  Gets the LCD Y size.
-  * @retval Used LCD Y size
-  */
-uint32_t BSP_LCD_GetYSize(void)
-{
-  return (lcd_y_size);
-}
-
-/**
-  * @brief  Set the LCD X size.
-  * @param  imageWidthPixels : uint32_t image width in pixels unit
-  * @retval None
-  */
-void BSP_LCD_SetXSize(uint32_t imageWidthPixels)
-{
-  hltdc_discovery.LayerCfg[ActiveLayer].ImageWidth = imageWidthPixels;
-}
-
-/**
-  * @brief  Set the LCD Y size.
-  * @param  imageHeightPixels : uint32_t image height in lines unit
-  */
-void BSP_LCD_SetYSize(uint32_t imageHeightPixels)
-{
-  hltdc_discovery.LayerCfg[ActiveLayer].ImageHeight = imageHeightPixels;
-}
-
-
-/**
-  * @brief  Initializes the LCD layers.
-  * @param  LayerIndex: Layer foreground or background
-  * @param  FB_Address: Layer frame buffer
-  * @retval None
-  */
-void BSP_LCD_LayerDefaultInit(uint16_t LayerIndex, uint32_t FB_Address)
-{
-    LCD_LayerCfgTypeDef  Layercfg;
-
-  /* Layer Init */
-  Layercfg.WindowX0 = 0;
-  Layercfg.WindowX1 = BSP_LCD_GetXSize();
-  Layercfg.WindowY0 = 0;
-  Layercfg.WindowY1 = BSP_LCD_GetYSize();
-  Layercfg.PixelFormat = LTDC_PIXEL_FORMAT_ARGB8888;
-  Layercfg.FBStartAdress = FB_Address;
-  Layercfg.Alpha = 255;
-  Layercfg.Alpha0 = 0;
-  Layercfg.Backcolor.Blue = 0;
-  Layercfg.Backcolor.Green = 0;
-  Layercfg.Backcolor.Red = 0;
-  Layercfg.BlendingFactor1 = LTDC_BLENDING_FACTOR1_PAxCA;
-  Layercfg.BlendingFactor2 = LTDC_BLENDING_FACTOR2_PAxCA;
-  Layercfg.ImageWidth = BSP_LCD_GetXSize();
-  Layercfg.ImageHeight = BSP_LCD_GetYSize();
-
-  HAL_LTDC_ConfigLayer(&hltdc_discovery, &Layercfg, LayerIndex);
-
-  DrawProp[LayerIndex].BackColor = LCD_COLOR_WHITE;
-  DrawProp[LayerIndex].pFont     = &Font24;
-  DrawProp[LayerIndex].TextColor = LCD_COLOR_BLACK;
-}
-
-
-/**
-  * @brief  Selects the LCD Layer.
-  * @param  LayerIndex: Layer foreground or background
-  */
-void BSP_LCD_SelectLayer(uint32_t LayerIndex)
-{
-  ActiveLayer = LayerIndex;
-}
-
-/**
-  * @brief  Sets an LCD Layer visible
-  * @param  LayerIndex: Visible Layer
-  * @param  State: New state of the specified layer
-  *          This parameter can be one of the following values:
-  *            @arg  ENABLE
-  *            @arg  DISABLE
-  */
-void BSP_LCD_SetLayerVisible(uint32_t LayerIndex, FunctionalState State)
-{
-  if(State == ENABLE)
-  {
-    __HAL_LTDC_LAYER_ENABLE(&(hltdc_discovery), LayerIndex);
-  }
-  else
-  {
-    __HAL_LTDC_LAYER_DISABLE(&(hltdc_discovery), LayerIndex);
-  }
-  __HAL_LTDC_RELOAD_CONFIG(&(hltdc_discovery));
-
-}
-
-/**
-  * @brief  Configures the transparency.
-  * @param  LayerIndex: Layer foreground or background.
-  * @param  Transparency: Transparency
-  *           This parameter must be a number between Min_Data = 0x00 and Max_Data = 0xFF
-  */
-void BSP_LCD_SetTransparency(uint32_t LayerIndex, uint8_t Transparency)
-{
-
-  HAL_LTDC_SetAlpha(&(hltdc_discovery), Transparency, LayerIndex);
-
-}
-
-/**
-  * @brief  Sets an LCD layer frame buffer address.
-  * @param  LayerIndex: Layer foreground or background
-  * @param  Address: New LCD frame buffer value
-  */
-void BSP_LCD_SetLayerAddress(uint32_t LayerIndex, uint32_t Address)
-{
-
-  HAL_LTDC_SetAddress(&(hltdc_discovery), Address, LayerIndex);
-
-}
-
-/**
-  * @brief  Sets display window.
-  * @param  LayerIndex: Layer index
-  * @param  Xpos: LCD X position
-  * @param  Ypos: LCD Y position
-  * @param  Width: LCD window width
-  * @param  Height: LCD window height
-  */
-void BSP_LCD_SetLayerWindow(uint16_t LayerIndex, uint16_t Xpos, uint16_t Ypos, uint16_t Width, uint16_t Height)
-{
-  /* Reconfigure the layer size */
-  HAL_LTDC_SetWindowSize(&(hltdc_discovery), Width, Height, LayerIndex);
-
-  /* Reconfigure the layer position */
-  HAL_LTDC_SetWindowPosition(&(hltdc_discovery), Xpos, Ypos, LayerIndex);
-
-}
-
-/**
-  * @brief  Configures and sets the color keying.
-  * @param  LayerIndex: Layer foreground or background
-  * @param  RGBValue: Color reference
-  */
-void BSP_LCD_SetColorKeying(uint32_t LayerIndex, uint32_t RGBValue)
-{
-  /* Configure and Enable the color Keying for LCD Layer */
-  HAL_LTDC_ConfigColorKeying(&(hltdc_discovery), RGBValue, LayerIndex);
-  HAL_LTDC_EnableColorKeying(&(hltdc_discovery), LayerIndex);
-}
-
-/**
-  * @brief  Disables the color keying.
-  * @param  LayerIndex: Layer foreground or background
-  */
-void BSP_LCD_ResetColorKeying(uint32_t LayerIndex)
-{
-  /* Disable the color Keying for LCD Layer */
-  HAL_LTDC_DisableColorKeying(&(hltdc_discovery), LayerIndex);
-}
-
-/**
-  * @brief  Sets the LCD text color.
-  * @param  Color: Text color code ARGB(8-8-8-8)
-  */
-void BSP_LCD_SetTextColor(uint32_t Color)
-{
-  DrawProp[ActiveLayer].TextColor = Color;
-}
-
-/**
-  * @brief  Gets the LCD text color.
-  * @retval Used text color.
-  */
-uint32_t BSP_LCD_GetTextColor(void)
-{
-  return DrawProp[ActiveLayer].TextColor;
-}
-
-/**
-  * @brief  Sets the LCD background color.
-  * @param  Color: Layer background color code ARGB(8-8-8-8)
-  */
-void BSP_LCD_SetBackColor(uint32_t Color)
-{
-  DrawProp[ActiveLayer].BackColor = Color;
-}
-
-/**
-  * @brief  Gets the LCD background color.
-  * @retval Used background color
-  */
-uint32_t BSP_LCD_GetBackColor(void)
-{
-  return DrawProp[ActiveLayer].BackColor;
-}
-
-/**
-  * @brief  Sets the LCD text font.
-  * @param  fonts: Layer font to be used
-  */
-void BSP_LCD_SetFont(sFONT *fonts)
-{
-  DrawProp[ActiveLayer].pFont = fonts;
-}
-
-/**
-  * @brief  Gets the LCD text font.
-  * @retval Used layer font
-  */
-sFONT *BSP_LCD_GetFont(void)
-{
-  return DrawProp[ActiveLayer].pFont;
-}
-
-/**
-  * @brief  Reads an LCD pixel.
-  * @param  Xpos: X position
-  * @param  Ypos: Y position
-  * @retval RGB pixel color
-  */
-uint32_t BSP_LCD_ReadPixel(uint16_t Xpos, uint16_t Ypos)
-{
-  uint32_t ret = 0;
-
-  if(hltdc_discovery.LayerCfg[ActiveLayer].PixelFormat == LTDC_PIXEL_FORMAT_ARGB8888)
-  {
-    /* Read data value from SDRAM memory */
-    ret = *(__IO uint32_t*) (hltdc_discovery.LayerCfg[ActiveLayer].FBStartAdress + (4*(Ypos*BSP_LCD_GetXSize() + Xpos)));
-  }
-  else if(hltdc_discovery.LayerCfg[ActiveLayer].PixelFormat == LTDC_PIXEL_FORMAT_RGB888)
-  {
-    /* Read data value from SDRAM memory */
-    ret = (*(__IO uint32_t*) (hltdc_discovery.LayerCfg[ActiveLayer].FBStartAdress + (4*(Ypos*BSP_LCD_GetXSize() + Xpos))) & 0x00FFFFFF);
-  }
-  else if((hltdc_discovery.LayerCfg[ActiveLayer].PixelFormat == LTDC_PIXEL_FORMAT_RGB565) || \
-          (hltdc_discovery.LayerCfg[ActiveLayer].PixelFormat == LTDC_PIXEL_FORMAT_ARGB4444) || \
-          (hltdc_discovery.LayerCfg[ActiveLayer].PixelFormat == LTDC_PIXEL_FORMAT_AL88))
-  {
-    /* Read data value from SDRAM memory */
-    ret = *(__IO uint16_t*) (hltdc_discovery.LayerCfg[ActiveLayer].FBStartAdress + (2*(Ypos*BSP_LCD_GetXSize() + Xpos)));
-  }
-  else
-  {
-    /* Read data value from SDRAM memory */
-    ret = *(__IO uint8_t*) (hltdc_discovery.LayerCfg[ActiveLayer].FBStartAdress + (2*(Ypos*BSP_LCD_GetXSize() + Xpos)));
+#if (USE_LCD_CTRL_OTM8009A == 1)
+        /* Initialize the OTM8009A LCD Display IC Driver (KoD LCD IC Driver)
+        depending on configuration of DSI */
+        if(OTM8009A_Probe(ctrl_pixel_format, Orientation) != BSP_ERROR_NONE)
+        {
+          ret = BSP_ERROR_UNKNOWN_COMPONENT;
+        }
+        else
+        {
+          ret = BSP_ERROR_NONE;
+        }
+#endif
+      }
+    /* By default the reload is activated and executed immediately */
+    Lcd_Ctx[Instance].ReloadEnable = 1U;
+   }
   }
 
   return ret;
 }
 
 /**
-  * @brief  Clears the whole currently active layer of LTDC.
-  * @param  Color: Color of the background
-  * @retval None
+  * @brief  De-Initializes the LCD resources.
+  * @param  Instance    LCD Instance
+  * @retval BSP status
   */
-void BSP_LCD_Clear(uint32_t Color)
+int32_t BSP_LCD_DeInit(uint32_t Instance)
 {
-  /* Clear the LCD */
-  LL_FillBuffer(ActiveLayer, (uint32_t *)(hltdc_discovery.LayerCfg[ActiveLayer].FBStartAdress), BSP_LCD_GetXSize(), BSP_LCD_GetYSize(), 0, Color);
-}
+  int32_t ret = BSP_ERROR_NONE;
 
-/**
-  * @brief  Clears the selected line in currently active layer.
-  * @param  Line: Line to be cleared
-  * @retval None
-  */
-void BSP_LCD_ClearStringLine(uint32_t Line)
-{
-  uint32_t color_backup = DrawProp[ActiveLayer].TextColor;
-  DrawProp[ActiveLayer].TextColor = DrawProp[ActiveLayer].BackColor;
-
-  /* Draw rectangle with background color */
-  BSP_LCD_FillRect(0, (Line * DrawProp[ActiveLayer].pFont->Height), BSP_LCD_GetXSize(), DrawProp[ActiveLayer].pFont->Height);
-
-  DrawProp[ActiveLayer].TextColor = color_backup;
-  BSP_LCD_SetTextColor(DrawProp[ActiveLayer].TextColor);
-}
-
-/**
-  * @brief  Displays one character in currently active layer.
-  * @param  Xpos: Start column address
-  * @param  Ypos: Line where to display the character shape.
-  * @param  Ascii: Character ascii code
-  *           This parameter must be a number between Min_Data = 0x20 and Max_Data = 0x7E
-  * @retval None
-  */
-void BSP_LCD_DisplayChar(uint16_t Xpos, uint16_t Ypos, uint8_t Ascii)
-{
-  DrawChar(Xpos, Ypos, &DrawProp[ActiveLayer].pFont->table[(Ascii-' ') *\
-    DrawProp[ActiveLayer].pFont->Height * ((DrawProp[ActiveLayer].pFont->Width + 7) / 8)]);
-}
-
-/**
-  * @brief  Displays characters in currently active layer.
-  * @param  Xpos: X position (in pixel)
-  * @param  Ypos: Y position (in pixel)
-  * @param  Text: Pointer to string to display on LCD
-  * @param  Mode: Display mode
-  *          This parameter can be one of the following values:
-  *            @arg  CENTER_MODE
-  *            @arg  RIGHT_MODE
-  *            @arg  LEFT_MODE
-  * @retval None
-  */
-void BSP_LCD_DisplayStringAt(uint16_t Xpos, uint16_t Ypos, uint8_t *Text, Text_AlignModeTypdef Mode)
-{
-  uint16_t refcolumn = 1, i = 0;
-  uint32_t size = 0, xsize = 0;
-  uint8_t  *ptr = Text;
-
-  /* Get the text size */
-  while (*ptr++) size ++ ;
-
-  /* Characters number per line */
-  xsize = (BSP_LCD_GetXSize()/DrawProp[ActiveLayer].pFont->Width);
-
-  switch (Mode)
+  if(Instance >= LCD_INSTANCES_NBR)
   {
-  case CENTER_MODE:
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    LCD_DeInitSequence();
+#if (USE_HAL_LTDC_REGISTER_CALLBACKS == 0)
+    LTDC_MspDeInit(&hlcd_ltdc);
+#endif /* (USE_HAL_LTDC_REGISTER_CALLBACKS == 0) */
+
+    DMA2D_MspDeInit(&hlcd_dma2d);
+
+#if (USE_HAL_DSI_REGISTER_CALLBACKS == 0)
+    DSI_MspDeInit(&hlcd_dsi);
+#endif /* (USE_HAL_DSI_REGISTER_CALLBACKS == 0) */
+    if(HAL_DSI_DeInit(&hlcd_dsi) != HAL_OK)
     {
-      refcolumn = Xpos + ((xsize - size)* DrawProp[ActiveLayer].pFont->Width) / 2;
-      break;
-    }
-  case LEFT_MODE:
-    {
-      refcolumn = Xpos;
-      break;
-    }
-  case RIGHT_MODE:
-    {
-      refcolumn = - Xpos + ((xsize - size)*DrawProp[ActiveLayer].pFont->Width);
-      break;
-    }
-  default:
-    {
-      refcolumn = Xpos;
-      break;
-    }
-  }
-
-  /* Check that the Start column is located in the screen */
-  if ((refcolumn < 1) || (refcolumn >= 0x8000))
-  {
-    refcolumn = 1;
-  }
-
-  /* Send the string character by character on LCD */
-  while ((*Text != 0) & (((BSP_LCD_GetXSize() - (i*DrawProp[ActiveLayer].pFont->Width)) & 0xFFFF) >= DrawProp[ActiveLayer].pFont->Width))
-  {
-    /* Display one character on LCD */
-    BSP_LCD_DisplayChar(refcolumn, Ypos, *Text);
-    /* Decrement the column position by 16 */
-    refcolumn += DrawProp[ActiveLayer].pFont->Width;
-
-    /* Point on the next character */
-    Text++;
-    i++;
-  }
-
-}
-
-/**
-  * @brief  Displays a maximum of 60 characters on the LCD.
-  * @param  Line: Line where to display the character shape
-  * @param  ptr: Pointer to string to display on LCD
-  * @retval None
-  */
-void BSP_LCD_DisplayStringAtLine(uint16_t Line, uint8_t *ptr)
-{
-  BSP_LCD_DisplayStringAt(0, LINE(Line), ptr, LEFT_MODE);
-}
-
-/**
-  * @brief  Draws an horizontal line in currently active layer.
-  * @param  Xpos: X position
-  * @param  Ypos: Y position
-  * @param  Length: Line length
-  * @retval None
-  */
-void BSP_LCD_DrawHLine(uint16_t Xpos, uint16_t Ypos, uint16_t Length)
-{
-  uint32_t  Xaddress = 0;
-
-  /* Get the line address */
-  Xaddress = (hltdc_discovery.LayerCfg[ActiveLayer].FBStartAdress) + 4*(BSP_LCD_GetXSize()*Ypos + Xpos);
-
-  /* Write line */
-  LL_FillBuffer(ActiveLayer, (uint32_t *)Xaddress, Length, 1, 0, DrawProp[ActiveLayer].TextColor);
-}
-
-/**
-  * @brief  Draws a vertical line in currently active layer.
-  * @param  Xpos: X position
-  * @param  Ypos: Y position
-  * @param  Length: Line length
-  * @retval None
-  */
-void BSP_LCD_DrawVLine(uint16_t Xpos, uint16_t Ypos, uint16_t Length)
-{
-  uint32_t  Xaddress = 0;
-
-  /* Get the line address */
-  Xaddress = (hltdc_discovery.LayerCfg[ActiveLayer].FBStartAdress) + 4*(BSP_LCD_GetXSize()*Ypos + Xpos);
-
-  /* Write line */
-  LL_FillBuffer(ActiveLayer, (uint32_t *)Xaddress, 1, Length, (BSP_LCD_GetXSize() - 1), DrawProp[ActiveLayer].TextColor);
-}
-
-/**
-  * @brief  Draws an uni-line (between two points) in currently active layer.
-  * @param  x1: Point 1 X position
-  * @param  y1: Point 1 Y position
-  * @param  x2: Point 2 X position
-  * @param  y2: Point 2 Y position
-  * @retval None
-  */
-void BSP_LCD_DrawLine(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
-{
-  int16_t deltax = 0, deltay = 0, x = 0, y = 0, xinc1 = 0, xinc2 = 0,
-  yinc1 = 0, yinc2 = 0, den = 0, num = 0, numadd = 0, numpixels = 0,
-  curpixel = 0;
-
-  deltax = ABS(x2 - x1);        /* The difference between the x's */
-  deltay = ABS(y2 - y1);        /* The difference between the y's */
-  x = x1;                       /* Start x off at the first pixel */
-  y = y1;                       /* Start y off at the first pixel */
-
-  if (x2 >= x1)                 /* The x-values are increasing */
-  {
-    xinc1 = 1;
-    xinc2 = 1;
-  }
-  else                          /* The x-values are decreasing */
-  {
-    xinc1 = -1;
-    xinc2 = -1;
-  }
-
-  if (y2 >= y1)                 /* The y-values are increasing */
-  {
-    yinc1 = 1;
-    yinc2 = 1;
-  }
-  else                          /* The y-values are decreasing */
-  {
-    yinc1 = -1;
-    yinc2 = -1;
-  }
-
-  if (deltax >= deltay)         /* There is at least one x-value for every y-value */
-  {
-    xinc1 = 0;                  /* Don't change the x when numerator >= denominator */
-    yinc2 = 0;                  /* Don't change the y for every iteration */
-    den = deltax;
-    num = deltax / 2;
-    numadd = deltay;
-    numpixels = deltax;         /* There are more x-values than y-values */
-  }
-  else                          /* There is at least one y-value for every x-value */
-  {
-    xinc2 = 0;                  /* Don't change the x for every iteration */
-    yinc1 = 0;                  /* Don't change the y when numerator >= denominator */
-    den = deltay;
-    num = deltay / 2;
-    numadd = deltax;
-    numpixels = deltay;         /* There are more y-values than x-values */
-  }
-
-  for (curpixel = 0; curpixel <= numpixels; curpixel++)
-  {
-    BSP_LCD_DrawPixel(x, y, DrawProp[ActiveLayer].TextColor);   /* Draw the current pixel */
-    num += numadd;                            /* Increase the numerator by the top of the fraction */
-    if (num >= den)                           /* Check if numerator >= denominator */
-    {
-      num -= den;                             /* Calculate the new numerator value */
-      x += xinc1;                             /* Change the x as appropriate */
-      y += yinc1;                             /* Change the y as appropriate */
-    }
-    x += xinc2;                               /* Change the x as appropriate */
-    y += yinc2;                               /* Change the y as appropriate */
-  }
-}
-
-/**
-  * @brief  Draws a rectangle in currently active layer.
-  * @param  Xpos: X position
-  * @param  Ypos: Y position
-  * @param  Width: Rectangle width
-  * @param  Height: Rectangle height
-  * @retval None
-  */
-void BSP_LCD_DrawRect(uint16_t Xpos, uint16_t Ypos, uint16_t Width, uint16_t Height)
-{
-  /* Draw horizontal lines */
-  BSP_LCD_DrawHLine(Xpos, Ypos, Width);
-  BSP_LCD_DrawHLine(Xpos, (Ypos+ Height), Width);
-
-  /* Draw vertical lines */
-  BSP_LCD_DrawVLine(Xpos, Ypos, Height);
-  BSP_LCD_DrawVLine((Xpos + Width), Ypos, Height);
-}
-
-/**
-  * @brief  Draws a circle in currently active layer.
-  * @param  Xpos: X position
-  * @param  Ypos: Y position
-  * @param  Radius: Circle radius
-  * @retval None
-  */
-void BSP_LCD_DrawCircle(uint16_t Xpos, uint16_t Ypos, uint16_t Radius)
-{
-  int32_t   D;    /* Decision Variable */
-  uint32_t  CurX; /* Current X Value */
-  uint32_t  CurY; /* Current Y Value */
-
-  D = 3 - (Radius << 1);
-  CurX = 0;
-  CurY = Radius;
-
-  while (CurX <= CurY)
-  {
-    BSP_LCD_DrawPixel((Xpos + CurX), (Ypos - CurY), DrawProp[ActiveLayer].TextColor);
-
-    BSP_LCD_DrawPixel((Xpos - CurX), (Ypos - CurY), DrawProp[ActiveLayer].TextColor);
-
-    BSP_LCD_DrawPixel((Xpos + CurY), (Ypos - CurX), DrawProp[ActiveLayer].TextColor);
-
-    BSP_LCD_DrawPixel((Xpos - CurY), (Ypos - CurX), DrawProp[ActiveLayer].TextColor);
-
-    BSP_LCD_DrawPixel((Xpos + CurX), (Ypos + CurY), DrawProp[ActiveLayer].TextColor);
-
-    BSP_LCD_DrawPixel((Xpos - CurX), (Ypos + CurY), DrawProp[ActiveLayer].TextColor);
-
-    BSP_LCD_DrawPixel((Xpos + CurY), (Ypos + CurX), DrawProp[ActiveLayer].TextColor);
-
-    BSP_LCD_DrawPixel((Xpos - CurY), (Ypos + CurX), DrawProp[ActiveLayer].TextColor);
-
-    if (D < 0)
-    {
-      D += (CurX << 2) + 6;
+      ret = BSP_ERROR_PERIPH_FAILURE;
     }
     else
     {
-      D += ((CurX - CurY) << 2) + 10;
-      CurY--;
+      (void)HAL_LTDC_DeInit(&hlcd_ltdc);
+      if(HAL_DMA2D_DeInit(&hlcd_dma2d) != HAL_OK)
+      {
+        ret = BSP_ERROR_PERIPH_FAILURE;
+      }
+      else
+      {
+        Lcd_Ctx[Instance].IsMspCallbacksValid = 0;
+      }
     }
-    CurX++;
   }
+
+  return ret;
 }
-
+#if (USE_LCD_CTRL_ADV7533 > 0)
 /**
-  * @brief  Draws an poly-line (between many points) in currently active layer.
-  * @param  Points: Pointer to the points array
-  * @param  PointCount: Number of points
-  * @retval None
+  * @brief  Initializes the LCD HDMI Mode.
+  * @param  Instance    LCD Instance
+  * @param  Format      HDMI format could be HDMI_FORMAT_720_480 or HDMI_FORMAT_720_576
+  * @retval BSP status
   */
-void BSP_LCD_DrawPolygon(pPoint Points, uint16_t PointCount)
+int32_t BSP_LCD_InitHDMI(uint32_t Instance, uint32_t Format)
 {
-  int16_t X = 0, Y = 0;
+  int32_t ret;
+  DSI_PLLInitTypeDef    dsiPllInit;
+  DSI_PHY_TimerTypeDef  dsiPhyInit;
+  MX_LTDC_LayerConfig_t hdmi_config;
+  LCD_HDMI_Timing_t     hdmi_timing;
+  DSI_VidCfgTypeDef     hDsiVideoMode;
 
-  if(PointCount < 2)
+  if(Instance >= LCD_INSTANCES_NBR)
   {
-    return;
-  }
-
-  BSP_LCD_DrawLine(Points->X, Points->Y, (Points+PointCount-1)->X, (Points+PointCount-1)->Y);
-
-  while(--PointCount)
-  {
-    X = Points->X;
-    Y = Points->Y;
-    Points++;
-    BSP_LCD_DrawLine(X, Y, Points->X, Points->Y);
-  }
-}
-
-/**
-  * @brief  Draws an ellipse on LCD in currently active layer.
-  * @param  Xpos: X position
-  * @param  Ypos: Y position
-  * @param  XRadius: Ellipse X radius
-  * @param  YRadius: Ellipse Y radius
-  * @retval None
-  */
-void BSP_LCD_DrawEllipse(int Xpos, int Ypos, int XRadius, int YRadius)
-{
-  int x = 0, y = -YRadius, err = 2-2*XRadius, e2;
-  float K = 0, rad1 = 0, rad2 = 0;
-
-  rad1 = XRadius;
-  rad2 = YRadius;
-
-  K = (float)(rad2/rad1);
-
-  do {
-    BSP_LCD_DrawPixel((Xpos-(uint16_t)(x/K)), (Ypos+y), DrawProp[ActiveLayer].TextColor);
-    BSP_LCD_DrawPixel((Xpos+(uint16_t)(x/K)), (Ypos+y), DrawProp[ActiveLayer].TextColor);
-    BSP_LCD_DrawPixel((Xpos+(uint16_t)(x/K)), (Ypos-y), DrawProp[ActiveLayer].TextColor);
-    BSP_LCD_DrawPixel((Xpos-(uint16_t)(x/K)), (Ypos-y), DrawProp[ActiveLayer].TextColor);
-
-    e2 = err;
-    if (e2 <= x) {
-      err += ++x*2+1;
-      if (-y == x && e2 <= y) e2 = 0;
-    }
-    if (e2 > y) err += ++y*2+1;
-  }
-  while (y <= 0);
-}
-
-/**
-  * @brief  Draws a bitmap picture loaded in the internal Flash (32 bpp) in currently active layer.
-  * @param  Xpos: Bmp X position in the LCD
-  * @param  Ypos: Bmp Y position in the LCD
-  * @param  pbmp: Pointer to Bmp picture address in the internal Flash
-  * @retval None
-  */
-void BSP_LCD_DrawBitmap(uint32_t Xpos, uint32_t Ypos, uint8_t *pbmp)
-{
-  uint32_t index = 0, width = 0, height = 0, bit_pixel = 0;
-  uint32_t Address;
-  uint32_t InputColorMode = 0;
-
-  /* Get bitmap data address offset */
-  index = *(__IO uint16_t *) (pbmp + 10);
-  index |= (*(__IO uint16_t *) (pbmp + 12)) << 16;
-
-  /* Read bitmap width */
-  width = *(uint16_t *) (pbmp + 18);
-  width |= (*(uint16_t *) (pbmp + 20)) << 16;
-
-  /* Read bitmap height */
-  height = *(uint16_t *) (pbmp + 22);
-  height |= (*(uint16_t *) (pbmp + 24)) << 16;
-
-  /* Read bit/pixel */
-  bit_pixel = *(uint16_t *) (pbmp + 28);
-
-  /* Set the address */
-  Address = hltdc_discovery.LayerCfg[ActiveLayer].FBStartAdress + (((BSP_LCD_GetXSize()*Ypos) + Xpos)*(4));
-
-  /* Get the layer pixel format */
-  if ((bit_pixel/8) == 4)
-  {
-    InputColorMode = DMA2D_INPUT_ARGB8888;
-  }
-  else if ((bit_pixel/8) == 2)
-  {
-    InputColorMode = DMA2D_INPUT_RGB565;
+    ret = BSP_ERROR_WRONG_PARAM;
   }
   else
   {
-    InputColorMode = DMA2D_INPUT_RGB888;
-  }
+    LCD_Get_HDMI_VideoModeTiming(Format, &hdmi_timing);
+    Lcd_Ctx[Instance].XSize       = hdmi_timing.HACT;
+    Lcd_Ctx[Instance].YSize       = hdmi_timing.VACT;
+    Lcd_Ctx[Instance].PixelFormat = LCD_PIXEL_FORMAT_RGB888;
 
-  /* Bypass the bitmap header */
-  pbmp += (index + (width * (height - 1) * (bit_pixel/8)));
+    /* Toggle Hardware Reset of the DSI LCD using
+    * its XRES signal (active low) */
+    BSP_LCD_Reset(Instance);
 
-  /* Convert picture to ARGB8888 pixel format */
-  for(index=0; index < height; index++)
-  {
-    /* Pixel format conversion */
-    LL_ConvertLineToARGB8888((uint32_t *)pbmp, (uint32_t *)Address, width, InputColorMode);
-
-    /* Increment the source and destination buffers */
-    Address+=  (BSP_LCD_GetXSize()*4);
-    pbmp -= width*(bit_pixel/8);
-  }
-}
-
-/**
-  * @brief  Draws a full rectangle in currently active layer.
-  * @param  Xpos: X position
-  * @param  Ypos: Y position
-  * @param  Width: Rectangle width
-  * @param  Height: Rectangle height
-  * @retval None
-  */
-void BSP_LCD_FillRect(uint16_t Xpos, uint16_t Ypos, uint16_t Width, uint16_t Height)
-{
-  uint32_t  Xaddress = 0;
-
-  /* Set the text color */
-  BSP_LCD_SetTextColor(DrawProp[ActiveLayer].TextColor);
-
-  /* Get the rectangle start address */
-  Xaddress = (hltdc_discovery.LayerCfg[ActiveLayer].FBStartAdress) + 4*(BSP_LCD_GetXSize()*Ypos + Xpos);
-
-  /* Fill the rectangle */
-  LL_FillBuffer(ActiveLayer, (uint32_t *)Xaddress, Width, Height, (BSP_LCD_GetXSize() - Width), DrawProp[ActiveLayer].TextColor);
-}
-
-/**
-  * @brief  Draws a full circle in currently active layer.
-  * @param  Xpos: X position
-  * @param  Ypos: Y position
-  * @param  Radius: Circle radius
-  * @retval None
-  */
-void BSP_LCD_FillCircle(uint16_t Xpos, uint16_t Ypos, uint16_t Radius)
-{
-  int32_t  D;     /* Decision Variable */
-  uint32_t  CurX; /* Current X Value */
-  uint32_t  CurY; /* Current Y Value */
-
-  D = 3 - (Radius << 1);
-
-  CurX = 0;
-  CurY = Radius;
-
-  BSP_LCD_SetTextColor(DrawProp[ActiveLayer].TextColor);
-
-  while (CurX <= CurY)
-  {
-    if(CurY > 0)
+    if(ADV7533_Probe() != BSP_ERROR_NONE)
     {
-      BSP_LCD_DrawHLine(Xpos - CurY, Ypos + CurX, 2*CurY);
-      BSP_LCD_DrawHLine(Xpos - CurY, Ypos - CurX, 2*CurY);
+      ret = BSP_ERROR_COMPONENT_FAILURE;
     }
-
-    if(CurX > 0)
+    else if(Lcd_Drv->DisplayOn(Lcd_CompObj)!= BSP_ERROR_NONE)
     {
-      BSP_LCD_DrawHLine(Xpos - CurX, Ypos - CurY, 2*CurX);
-      BSP_LCD_DrawHLine(Xpos - CurX, Ypos + CurY, 2*CurX);
-    }
-    if (D < 0)
-    {
-      D += (CurX << 2) + 6;
+      ret = BSP_ERROR_COMPONENT_FAILURE;
     }
     else
     {
-      D += ((CurX - CurY) << 2) + 10;
-      CurY--;
-    }
-    CurX++;
-  }
-
-  BSP_LCD_SetTextColor(DrawProp[ActiveLayer].TextColor);
-  BSP_LCD_DrawCircle(Xpos, Ypos, Radius);
-}
-
-/**
-  * @brief  Draws a full poly-line (between many points) in currently active layer.
-  * @param  Points: Pointer to the points array
-  * @param  PointCount: Number of points
-  * @retval None
-  */
-void BSP_LCD_FillPolygon(pPoint Points, uint16_t PointCount)
-{
-  int16_t X = 0, Y = 0, X2 = 0, Y2 = 0, X_center = 0, Y_center = 0, X_first = 0, Y_first = 0, pixelX = 0, pixelY = 0, counter = 0;
-  uint16_t  IMAGE_LEFT = 0, IMAGE_RIGHT = 0, IMAGE_TOP = 0, IMAGE_BOTTOM = 0;
-
-  IMAGE_LEFT = IMAGE_RIGHT = Points->X;
-  IMAGE_TOP= IMAGE_BOTTOM = Points->Y;
-
-  for(counter = 1; counter < PointCount; counter++)
-  {
-    pixelX = POLY_X(counter);
-    if(pixelX < IMAGE_LEFT)
-    {
-      IMAGE_LEFT = pixelX;
-    }
-    if(pixelX > IMAGE_RIGHT)
-    {
-      IMAGE_RIGHT = pixelX;
-    }
-
-    pixelY = POLY_Y(counter);
-    if(pixelY < IMAGE_TOP)
-    {
-      IMAGE_TOP = pixelY;
-    }
-    if(pixelY > IMAGE_BOTTOM)
-    {
-      IMAGE_BOTTOM = pixelY;
-    }
-  }
-
-  if(PointCount < 2)
-  {
-    return;
-  }
-
-  X_center = (IMAGE_LEFT + IMAGE_RIGHT)/2;
-  Y_center = (IMAGE_BOTTOM + IMAGE_TOP)/2;
-
-  X_first = Points->X;
-  Y_first = Points->Y;
-
-  while(--PointCount)
-  {
-    X = Points->X;
-    Y = Points->Y;
-    Points++;
-    X2 = Points->X;
-    Y2 = Points->Y;
-
-    FillTriangle(X, X2, X_center, Y, Y2, Y_center);
-    FillTriangle(X, X_center, X2, Y, Y_center, Y2);
-    FillTriangle(X_center, X2, X, Y_center, Y2, Y);
-  }
-
-  FillTriangle(X_first, X2, X_center, Y_first, Y2, Y_center);
-  FillTriangle(X_first, X_center, X2, Y_first, Y_center, Y2);
-  FillTriangle(X_center, X2, X_first, Y_center, Y2, Y_first);
-}
-
-/**
-  * @brief  Draws a full ellipse in currently active layer.
-  * @param  Xpos: X position
-  * @param  Ypos: Y position
-  * @param  XRadius: Ellipse X radius
-  * @param  YRadius: Ellipse Y radius
-  * @retval None
-  */
-void BSP_LCD_FillEllipse(int Xpos, int Ypos, int XRadius, int YRadius)
-{
-  int x = 0, y = -YRadius, err = 2-2*XRadius, e2;
-  float K = 0, rad1 = 0, rad2 = 0;
-
-  rad1 = XRadius;
-  rad2 = YRadius;
-
-  K = (float)(rad2/rad1);
-
-  do
-  {
-    BSP_LCD_DrawHLine((Xpos-(uint16_t)(x/K)), (Ypos+y), (2*(uint16_t)(x/K) + 1));
-    BSP_LCD_DrawHLine((Xpos-(uint16_t)(x/K)), (Ypos-y), (2*(uint16_t)(x/K) + 1));
-
-    e2 = err;
-    if (e2 <= x)
-    {
-      err += ++x*2+1;
-      if (-y == x && e2 <= y) e2 = 0;
-    }
-    if (e2 > y) err += ++y*2+1;
-  }
-  while (y <= 0);
-}
-
-/**
-  * @brief  Switch back on the display if was switched off by previous call of BSP_LCD_DisplayOff().
-  *         Exit DSI ULPM mode if was allowed and configured in Dsi Configuration.
-  * @retval None
-  */
-void BSP_LCD_DisplayOn(void)
-{
-#if defined(USE_LCD_HDMI)
-  if(ADV7533_ID == adv7533_drv.ReadID(ADV7533_CEC_DSI_I2C_ADDR))
-  {
-    return ; /* Not supported for HDMI display */
-  }
-  else
-#endif /* USE_LCD_HDMI */
-  {
-
-    /* Send Display on DCS command to display */
-    HAL_DSI_ShortWrite(&(hdsi_discovery),
-                       hdsivideo_handle.VirtualChannelID,
-                       DSI_DCS_SHORT_PKT_WRITE_P1,
-                       OTM8009A_CMD_DISPON,
-                       0x00);
-  }
-
-}
-
-/**
-  * @brief  Switch Off the display.
-  *         Enter DSI ULPM mode if was allowed and configured in Dsi Configuration.
-  * @retval None
-  */
-void BSP_LCD_DisplayOff(void)
-{
-#if defined(USE_LCD_HDMI)
-  if(ADV7533_ID == adv7533_drv.ReadID(ADV7533_CEC_DSI_I2C_ADDR))
-  {
-    return ; /* Not supported for HDMI yet */
-  }
-  else
-#endif /* USE_LCD_HDMI */
-  {
-    /* Send Display off DCS Command to display */
-    HAL_DSI_ShortWrite(&(hdsi_discovery),
-                       hdsivideo_handle.VirtualChannelID,
-                       DSI_DCS_SHORT_PKT_WRITE_P1,
-                       OTM8009A_CMD_DISPOFF,
-                       0x00);
-  }
-
-}
-
-/**
-  * @brief  Set the brightness value
-  * @param  BrightnessValue: [00: Min (black), 100 Max]
-  * @retval None
-  */
-void BSP_LCD_SetBrightness(uint8_t BrightnessValue)
-{
-#if defined(USE_LCD_HDMI)
-  if(ADV7533_ID == adv7533_drv.ReadID(ADV7533_CEC_DSI_I2C_ADDR))
-  {
-    return ;  /* Not supported for HDMI display */
-  }
-  else
-#endif /* USE_LCD_HDMI */
-  {
-    /* Send Display on DCS command to display */
-    HAL_DSI_ShortWrite(&hdsi_discovery,
-                       LCD_OTM8009A_ID,
-                       DSI_DCS_SHORT_PKT_WRITE_P1,
-                       OTM8009A_CMD_WRDISBV, (uint16_t)(BrightnessValue * 255)/100);
-  }
-
-}
-
-/**
-  * @brief  DCS or Generic short/long write command
-  * @param  NbrParams: Number of parameters. It indicates the write command mode:
-  *                 If inferior to 2, a long write command is performed else short.
-  * @param  pParams: Pointer to parameter values table.
-  * @retval None
-  */
-void DSI_IO_WriteCmd(uint32_t NbrParams, uint8_t *pParams)
-{
-  if(NbrParams <= 1)
-  {
-   HAL_DSI_ShortWrite(&hdsi_discovery, LCD_OTM8009A_ID, DSI_DCS_SHORT_PKT_WRITE_P1, pParams[0], pParams[1]);
-  }
-  else
-  {
-   HAL_DSI_LongWrite(&hdsi_discovery,  LCD_OTM8009A_ID, DSI_DCS_LONG_PKT_WRITE, NbrParams, pParams[NbrParams], pParams);
-  }
-}
-
-/**
-  * @brief  Returns the ID of connected screen by checking the HDMI
-  *        (adv7533 component) ID or LCD DSI (via TS ID) ID.
-  * @retval LCD ID
-  */
-static uint16_t LCD_IO_GetID(void)
-{
-#if defined(USE_LCD_HDMI)
-  HDMI_IO_Init();
-
-  HDMI_IO_Delay(120);
-
-  if(ADV7533_ID == adv7533_drv.ReadID(ADV7533_CEC_DSI_I2C_ADDR))
-  {
-    return ADV7533_ID;
-  }
-  else if(((HDMI_IO_Read(LCD_DSI_ADDRESS, LCD_DSI_ID_REG) == LCD_DSI_ID)) || \
-           (HDMI_IO_Read(LCD_DSI_ADDRESS_A02, LCD_DSI_ID_REG) == LCD_DSI_ID))
-  {
-    return LCD_DSI_ID;
-  }
-  else
-  {
-    return 0;
-  }
+      /* Call first MSP Initialize only in case of first initialization
+      * This will set IP blocks LTDC, DSI and DMA2D
+      * - out of reset
+      * - clocked
+      * - NVIC IRQ related to IP blocks enabled
+      */
+#if (USE_HAL_LTDC_REGISTER_CALLBACKS == 1)
+      /* Register the LTDC MSP Callbacks */
+      if(Lcd_Ctx[Instance].IsMspCallbacksValid == 0U)
+      {
+        if(BSP_LCD_RegisterDefaultMspCallbacks(0) != BSP_ERROR_NONE)
+        {
+          return BSP_ERROR_PERIPH_FAILURE;
+        }
+      }
 #else
-  return LCD_DSI_ID;
-#endif /* USE_LCD_HDMI */
+      LTDC_MspInit(&hlcd_ltdc);
+#endif
 
+      DMA2D_MspInit(&hlcd_dma2d);
+
+#if (USE_HAL_DSI_REGISTER_CALLBACKS == 1)
+      /* Register the DSI MSP Callbacks */
+      if(Lcd_Ctx[Instance].IsMspCallbacksValid == 0U)
+      {
+        if(BSP_LCD_RegisterDefaultMspCallbacks(0) != BSP_ERROR_NONE)
+        {
+          return BSP_ERROR_PERIPH_FAILURE;
+        }
+      }
+#else
+      DSI_MspInit(&hlcd_dsi);
+#endif
+
+      /*************************DSI Initialization***********************************/
+      /* Base address of DSI Host/Wrapper registers to be set before calling De-Init */
+      hlcd_dsi.Instance = DSI;
+      /* Set number of Lanes */
+      hlcd_dsi.Init.NumberOfLanes = DSI_TWO_DATA_LANES;
+      /* Set the TX escape clock division ratio */
+      hlcd_dsi.Init.TXEscapeCkdiv = 3U;
+
+      /* Configure the DSI PLL */
+      dsiPllInit.PLLNDIV    = 65U;
+      dsiPllInit.PLLIDF     = DSI_PLL_IN_DIV5;
+      dsiPllInit.PLLODF     = DSI_PLL_OUT_DIV1;
+      if(HAL_DSI_Init(&hlcd_dsi, &dsiPllInit) != HAL_OK)
+      {
+        return BSP_ERROR_PERIPH_FAILURE;
+      }
+
+      /* Configure the D-PHY Timings */
+      dsiPhyInit.ClockLaneHS2LPTime  = hdmi_timing.ClockLaneHS2LPTime;
+      dsiPhyInit.ClockLaneLP2HSTime  = hdmi_timing.ClockLaneLP2HSTime;
+      dsiPhyInit.DataLaneHS2LPTime   = hdmi_timing.DataLaneHS2LPTime;
+      dsiPhyInit.DataLaneLP2HSTime   = hdmi_timing.DataLaneLP2HSTime;
+      dsiPhyInit.DataLaneMaxReadTime = hdmi_timing.DataLaneMaxReadTime;
+      dsiPhyInit.StopWaitTime        = hdmi_timing.StopWaitTime;
+      if(HAL_DSI_ConfigPhyTimer(&hlcd_dsi, &dsiPhyInit) != HAL_OK)
+      {
+        return BSP_ERROR_PERIPH_FAILURE;
+      }
+
+      /* Timing parameters for all Video modes */
+      /*
+      The lane byte clock is set 40625 Khz
+      The pixel clock is set to 27083 Khz
+      */
+      hDsiVideoMode.VirtualChannelID = 0;
+      hDsiVideoMode.ColorCoding      = DSI_RGB888;
+      hDsiVideoMode.LooselyPacked    = DSI_LOOSELY_PACKED_DISABLE;
+      hDsiVideoMode.VSPolarity       = DSI_VSYNC_ACTIVE_LOW;
+      hDsiVideoMode.HSPolarity       = DSI_HSYNC_ACTIVE_LOW;
+      hDsiVideoMode.DEPolarity       = DSI_DATA_ENABLE_ACTIVE_HIGH;
+      hDsiVideoMode.Mode             = DSI_VID_MODE_NB_PULSES;
+      hDsiVideoMode.NullPacketSize   = 0U;
+      hDsiVideoMode.NumberOfChunks   = 1U;
+      hDsiVideoMode.PacketSize       = hdmi_timing.HACT; /* Value depending on display format */
+      hDsiVideoMode.HorizontalSyncActive = (hdmi_timing.HSYNC * 40625U)/27083U;
+      hDsiVideoMode.HorizontalBackPorch  = (hdmi_timing.HBP * 40625U)/27083U;
+      hDsiVideoMode.HorizontalLine = ((hdmi_timing.HACT + hdmi_timing.HSYNC + hdmi_timing.HBP + hdmi_timing.HFP) * 40625U)/27083U; /* Value depending on display format */
+      hDsiVideoMode.VerticalSyncActive        = hdmi_timing.VSYNC;
+      hDsiVideoMode.VerticalBackPorch         = hdmi_timing.VBP;
+      hDsiVideoMode.VerticalFrontPorch        = hdmi_timing.VFP;
+      hDsiVideoMode.VerticalActive            = hdmi_timing.VACT; /* Value depending on display format */
+
+      /* Enable or disable sending LP command while streaming is active in video mode */
+      hDsiVideoMode.LPCommandEnable = DSI_LP_COMMAND_ENABLE; /* Enable sending commands in mode LP (Low Power) */
+
+      /* Largest packet size possible to transmit in LP mode in VSA, VBP, VFP regions */
+      /* Only useful when sending LP packets is allowed while streaming is active in video mode */
+      hDsiVideoMode.LPLargestPacketSize     = 4;
+
+      /* Largest packet size possible to transmit in LP mode in HFP region during VACT period */
+      /* Only useful when sending LP packets is allowed while streaming is active in video mode */
+      hDsiVideoMode.LPVACTLargestPacketSize = 4;
+
+      /* Specify for each region of the video frame, if the transmission of command in LP mode is allowed in this region */
+      /* while streaming is active in video mode                                                                         */
+      hDsiVideoMode.LPHorizontalFrontPorchEnable = DSI_LP_HFP_ENABLE;   /* Allow sending LP commands during HFP period */
+      hDsiVideoMode.LPHorizontalBackPorchEnable  = DSI_LP_HBP_ENABLE;   /* Allow sending LP commands during HBP period */
+      hDsiVideoMode.LPVerticalActiveEnable       = DSI_LP_VACT_ENABLE;  /* Allow sending LP commands during VACT period */
+      hDsiVideoMode.LPVerticalFrontPorchEnable   = DSI_LP_VFP_ENABLE;   /* Allow sending LP commands during VFP period */
+      hDsiVideoMode.LPVerticalBackPorchEnable    = DSI_LP_VBP_ENABLE;   /* Allow sending LP commands during VBP period */
+      hDsiVideoMode.LPVerticalSyncActiveEnable   = DSI_LP_VSYNC_ENABLE; /* Allow sending LP commands during VSync = VSA period */
+
+      /* Configure DSI Video mode timings with settings set above */
+      (void)HAL_DSI_ConfigVideoMode(&(hlcd_dsi), &(hDsiVideoMode));
+
+      if(MX_LTDC_ClockConfig2(&hlcd_ltdc) != HAL_OK)
+      {
+        return BSP_ERROR_CLOCK_FAILURE;
+      }
+
+      /* Initialize LTDC */
+      LTDC_HDMI_Init(&hdmi_timing);
+      hdmi_config.X0          = 0;
+      hdmi_config.X1          = Lcd_Ctx[Instance].XSize;
+      hdmi_config.Y0          = 0;
+      hdmi_config.Y1          = Lcd_Ctx[Instance].YSize;
+      hdmi_config.PixelFormat = LTDC_PIXEL_FORMAT_ARGB8888;
+      hdmi_config.Address     = LCD_LAYER_0_ADDRESS;
+      if(MX_LTDC_ConfigLayer(&hlcd_ltdc, 0, &hdmi_config) != HAL_OK)
+      {
+        return BSP_ERROR_PERIPH_FAILURE;
+      }
+      /* Enable the DSI host and wrapper after the LTDC initialization
+      To avoid any synchronization issue, the DSI shall be started after enabling the LTDC */
+      (void)HAL_DSI_Start(&(hlcd_dsi));
+
+#if !defined(DATA_IN_ExtSDRAM)
+      /* Initialize the SDRAM */
+      if(BSP_SDRAM_Init(0) != BSP_ERROR_NONE)
+      {
+        return BSP_ERROR_PERIPH_FAILURE;
+      }
+#endif /* DATA_IN_ExtSDRAM */
+
+      ret = BSP_ERROR_NONE;
+    }
+  }
+
+  return ret;
 }
 
-/*******************************************************************************
-                       LTDC, DMA2D and DSI BSP Routines
-*******************************************************************************/
+#endif /*USE_LCD_CTRL_ADV7533 > 0*/
 /**
-  * @brief  De-Initializes the BSP LCD Msp
-  *         Application can surcharge if needed this function implementation.
-  * @retval None
+  * @brief  BSP LCD Reset
+  *         Hw reset the LCD DSI activating its XRES signal (active low for some time)
+  *         and deactivating it later.
+  * @param  Instance LCD Instance
   */
-__weak void BSP_LCD_MspDeInit(void)
+void BSP_LCD_Reset(uint32_t Instance)
 {
-  /** @brief Disable IRQ of LTDC IP */
-  HAL_NVIC_DisableIRQ(LTDC_IRQn);
+  GPIO_InitTypeDef  gpio_init_structure;
 
-  /** @brief Disable IRQ of DMA2D IP */
-  HAL_NVIC_DisableIRQ(DMA2D_IRQn);
+  LCD_RESET_GPIO_CLK_ENABLE();
 
-  /** @brief Disable IRQ of DSI IP */
-  HAL_NVIC_DisableIRQ(DSI_IRQn);
+  /* Configure the GPIO Reset pin */
+  gpio_init_structure.Pin   = LCD_RESET_PIN;
+  gpio_init_structure.Mode  = GPIO_MODE_OUTPUT_PP;
+  gpio_init_structure.Pull  = GPIO_PULLUP;
+  gpio_init_structure.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(LCD_RESET_GPIO_PORT , &gpio_init_structure);
 
-  /** @brief Force and let in reset state LTDC, DMA2D and DSI Host + Wrapper IPs */
-  __HAL_RCC_LTDC_FORCE_RESET();
-  __HAL_RCC_DMA2D_FORCE_RESET();
-  __HAL_RCC_DSI_FORCE_RESET();
-
-  /** @brief Disable the LTDC, DMA2D and DSI Host and Wrapper clocks */
-  __HAL_RCC_LTDC_CLK_DISABLE();
-  __HAL_RCC_DMA2D_CLK_DISABLE();
-  __HAL_RCC_DSI_CLK_DISABLE();
+  /* Activate XRES active low */
+  HAL_GPIO_WritePin(LCD_RESET_GPIO_PORT , LCD_RESET_PIN, GPIO_PIN_RESET);
+  HAL_Delay(20);/* wait 20 ms */
+  HAL_GPIO_WritePin(LCD_RESET_GPIO_PORT , LCD_RESET_PIN, GPIO_PIN_SET);/* Deactivate XRES */
+  HAL_Delay(10);/* Wait for 10ms after releasing XRES before sending commands */
 }
 
 /**
-  * @brief  Initialize the BSP LCD Msp.
-  *         Application can surcharge if needed this function implementation
+  * @brief  Configure LCD control pins (Back-light, Display Enable and TE)
   * @retval None
   */
-__weak void BSP_LCD_MspInit(void)
+static void LCD_InitSequence(void)
 {
-  /** @brief Enable the LTDC clock */
-  __HAL_RCC_LTDC_CLK_ENABLE();
+  GPIO_InitTypeDef  gpio_init_structure;
 
-  /** @brief Toggle Sw reset of LTDC IP */
-  __HAL_RCC_LTDC_FORCE_RESET();
-  __HAL_RCC_LTDC_RELEASE_RESET();
+  /* LCD_BL_CTRL GPIO configuration */
+  LCD_BL_CTRL_GPIO_CLK_ENABLE();
 
-  /** @brief Enable the DMA2D clock */
-  __HAL_RCC_DMA2D_CLK_ENABLE();
+  gpio_init_structure.Pin       = LCD_BL_CTRL_PIN;
+  gpio_init_structure.Mode      = GPIO_MODE_OUTPUT_PP;
+  gpio_init_structure.Speed     = GPIO_SPEED_FREQ_HIGH;
 
-  /** @brief Toggle Sw reset of DMA2D IP */
-  __HAL_RCC_DMA2D_FORCE_RESET();
-  __HAL_RCC_DMA2D_RELEASE_RESET();
+  HAL_GPIO_Init(LCD_BL_CTRL_GPIO_PORT, &gpio_init_structure);
+  /* Assert back-light LCD_BL_CTRL pin */
+  HAL_GPIO_WritePin(LCD_BL_CTRL_GPIO_PORT, LCD_BL_CTRL_PIN, GPIO_PIN_SET);
 
-  /** @brief Enable DSI Host and wrapper clocks */
-  __HAL_RCC_DSI_CLK_ENABLE();
+  /* LCD_TE_CTRL GPIO configuration */
+  LCD_TE_GPIO_CLK_ENABLE();
 
-  /** @brief Soft Reset the DSI Host and wrapper */
-  __HAL_RCC_DSI_FORCE_RESET();
-  __HAL_RCC_DSI_RELEASE_RESET();
+  gpio_init_structure.Pin       = LCD_TE_PIN;
+  gpio_init_structure.Mode      = GPIO_MODE_INPUT;
+  gpio_init_structure.Speed     = GPIO_SPEED_FREQ_HIGH;
 
-  /** @brief NVIC configuration for LTDC interrupt that is now enabled */
+  HAL_GPIO_Init(LCD_TE_GPIO_PORT, &gpio_init_structure);
+  /* Assert back-light LCD_BL_CTRL pin */
+  HAL_GPIO_WritePin(LCD_TE_GPIO_PORT, LCD_TE_PIN, GPIO_PIN_SET);
+
+      /** @brief NVIC configuration for LTDC interrupt that is now enabled */
   HAL_NVIC_SetPriority(LTDC_IRQn, 0x0F, 0);
   HAL_NVIC_EnableIRQ(LTDC_IRQn);
 
@@ -1739,229 +674,1423 @@ __weak void BSP_LCD_MspInit(void)
 }
 
 /**
-  * @brief  Draws a pixel on LCD.
-  * @param  Xpos: X position
-  * @param  Ypos: Y position
-  * @param  RGB_Code: Pixel color in ARGB mode (8-8-8-8)
+  * @brief  DeInitializes LCD GPIO special pins MSP.
   * @retval None
   */
-void BSP_LCD_DrawPixel(uint16_t Xpos, uint16_t Ypos, uint32_t RGB_Code)
+static void LCD_DeInitSequence(void)
 {
-  /* Write data value to all SDRAM memory */
-  *(__IO uint32_t*) (hltdc_discovery.LayerCfg[ActiveLayer].FBStartAdress + (4*(Ypos*BSP_LCD_GetXSize() + Xpos))) = RGB_Code;
+  GPIO_InitTypeDef  gpio_init_structure;
+
+  /* LCD_BL_CTRL GPIO configuration */
+  /* LCD_BL_CTRL GPIO deactivation */
+  gpio_init_structure.Pin       = LCD_BL_CTRL_PIN;
+  HAL_GPIO_DeInit(LCD_BL_CTRL_GPIO_PORT, gpio_init_structure.Pin);
+
+  /* LCD_TE_CTRL GPIO configuration */
 }
+
+/**
+  * @brief  Initializes the DSIHOST.
+  * @param  hdsi   DSI handle
+  * @param  Width  Horizontal active width
+  * @param  Height Vertical active height
+  * @param  PixelFormat DSI color coding RGB888 or RGB565
+  * @retval HAL status
+  */
+__weak HAL_StatusTypeDef MX_DSIHOST_DSI_Init(DSI_HandleTypeDef *hdsi, uint32_t Width, uint32_t Height, uint32_t PixelFormat)
+{
+  DSI_PLLInitTypeDef PLLInit;
+  DSI_VidCfgTypeDef VidCfg;
+
+  hdsi->Instance = DSI;
+  hdsi->Init.AutomaticClockLaneControl = DSI_AUTO_CLK_LANE_CTRL_DISABLE;
+  hdsi->Init.TXEscapeCkdiv = 4;
+  hdsi->Init.NumberOfLanes = DSI_TWO_DATA_LANES;
+  PLLInit.PLLNDIV = 100;
+  PLLInit.PLLIDF = DSI_PLL_IN_DIV5;
+  PLLInit.PLLODF = DSI_PLL_OUT_DIV1;
+  if (HAL_DSI_Init(hdsi, &PLLInit) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  /* Timing parameters for all Video modes */
+  /*
+  The lane byte clock is set 62500 Khz
+  The pixel clock is set to 27429 Khz
+  */
+  VidCfg.VirtualChannelID = 0;
+  VidCfg.ColorCoding = PixelFormat;
+  VidCfg.LooselyPacked = DSI_LOOSELY_PACKED_DISABLE;
+  VidCfg.Mode = DSI_VID_MODE_BURST;
+  VidCfg.PacketSize = Width;
+  VidCfg.NumberOfChunks = 0;
+  VidCfg.NullPacketSize = 0xFFFU;
+  VidCfg.HSPolarity = DSI_HSYNC_ACTIVE_HIGH;
+  VidCfg.VSPolarity = DSI_VSYNC_ACTIVE_HIGH;
+  VidCfg.DEPolarity = DSI_DATA_ENABLE_ACTIVE_HIGH;
+  VidCfg.HorizontalSyncActive = (OTM8009A_480X800_HSYNC * 62500U)/27429U;
+  VidCfg.HorizontalBackPorch = (OTM8009A_480X800_HBP * 62500U)/27429U;
+  VidCfg.HorizontalLine = ((Width + OTM8009A_480X800_HSYNC + OTM8009A_480X800_HBP + OTM8009A_480X800_HFP) * 62500U)/27429U;
+  VidCfg.VerticalSyncActive = OTM8009A_480X800_VSYNC;
+  VidCfg.VerticalBackPorch = OTM8009A_480X800_VBP;
+  VidCfg.VerticalFrontPorch = OTM8009A_480X800_VFP;
+  VidCfg.VerticalActive = Height;
+  VidCfg.LPCommandEnable = DSI_LP_COMMAND_ENABLE;
+  VidCfg.LPLargestPacketSize = 4;
+  VidCfg.LPVACTLargestPacketSize = 4;
+
+  VidCfg.LPHorizontalFrontPorchEnable  = DSI_LP_HFP_ENABLE;
+  VidCfg.LPHorizontalBackPorchEnable   = DSI_LP_HBP_ENABLE;
+  VidCfg.LPVerticalActiveEnable        = DSI_LP_VACT_ENABLE;
+  VidCfg.LPVerticalFrontPorchEnable    = DSI_LP_VFP_ENABLE;
+  VidCfg.LPVerticalBackPorchEnable     = DSI_LP_VBP_ENABLE;
+  VidCfg.LPVerticalSyncActiveEnable    = DSI_LP_VSYNC_ENABLE;
+
+  if (HAL_DSI_ConfigVideoMode(hdsi, &VidCfg) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  return HAL_OK;
+}
+
+/**
+  * @brief  Initializes the LTDC.
+  * @param  hltdc  LTDC handle
+  * @param  Width  LTDC width
+  * @param  Height LTDC height
+  * @retval HAL status
+  */
+__weak HAL_StatusTypeDef MX_LTDC_Init(LTDC_HandleTypeDef *hltdc, uint32_t Width, uint32_t Height)
+{
+  hltdc->Instance = LTDC;
+  hltdc->Init.HSPolarity = LTDC_HSPOLARITY_AL;
+  hltdc->Init.VSPolarity = LTDC_VSPOLARITY_AL;
+  hltdc->Init.DEPolarity = LTDC_DEPOLARITY_AL;
+  hltdc->Init.PCPolarity = LTDC_PCPOLARITY_IPC;
+
+  hltdc->Init.HorizontalSync     = OTM8009A_480X800_HSYNC - 1;
+  hltdc->Init.AccumulatedHBP     = OTM8009A_480X800_HSYNC + OTM8009A_480X800_HBP - 1;
+  hltdc->Init.AccumulatedActiveW = OTM8009A_480X800_HSYNC + Width + OTM8009A_480X800_HBP - 1;
+  hltdc->Init.TotalWidth         = OTM8009A_480X800_HSYNC + Width + OTM8009A_480X800_HBP + OTM8009A_480X800_HFP - 1;
+  hltdc->Init.VerticalSync       = OTM8009A_480X800_VSYNC - 1;
+  hltdc->Init.AccumulatedVBP     = OTM8009A_480X800_VSYNC + OTM8009A_480X800_VBP - 1;
+  hltdc->Init.AccumulatedActiveH = OTM8009A_480X800_VSYNC + Height + OTM8009A_480X800_VBP - 1;
+  hltdc->Init.TotalHeigh         = OTM8009A_480X800_VSYNC + Height + OTM8009A_480X800_VBP + OTM8009A_480X800_VFP - 1;
+
+  hltdc->Init.Backcolor.Blue  = 0x00;
+  hltdc->Init.Backcolor.Green = 0x00;
+  hltdc->Init.Backcolor.Red   = 0x00;
+
+  return HAL_LTDC_Init(hltdc);
+}
+
+/**
+  * @brief  MX LTDC layer configuration.
+  * @param  hltdc      LTDC handle
+  * @param  LayerIndex Layer 0 or 1
+  * @param  Config     Layer configuration
+  * @retval HAL status
+  */
+__weak HAL_StatusTypeDef MX_LTDC_ConfigLayer(LTDC_HandleTypeDef *hltdc, uint32_t LayerIndex, MX_LTDC_LayerConfig_t *Config)
+{
+  LTDC_LayerCfgTypeDef pLayerCfg;
+
+  pLayerCfg.WindowX0 = Config->X0;
+  pLayerCfg.WindowX1 = Config->X1;
+  pLayerCfg.WindowY0 = Config->Y0;
+  pLayerCfg.WindowY1 = Config->Y1;
+  pLayerCfg.PixelFormat = Config->PixelFormat;
+  pLayerCfg.Alpha = 255;
+  pLayerCfg.Alpha0 = 0;
+  pLayerCfg.BlendingFactor1 = LTDC_BLENDING_FACTOR1_PAxCA;
+  pLayerCfg.BlendingFactor2 = LTDC_BLENDING_FACTOR2_PAxCA;
+  pLayerCfg.FBStartAdress = Config->Address;
+  pLayerCfg.ImageWidth = (Config->X1 - Config->X0);
+  pLayerCfg.ImageHeight = (Config->Y1 - Config->Y0);
+  pLayerCfg.Backcolor.Blue = 0;
+  pLayerCfg.Backcolor.Green = 0;
+  pLayerCfg.Backcolor.Red = 0;
+  return HAL_LTDC_ConfigLayer(hltdc, &pLayerCfg, LayerIndex);
+}
+
+/**
+  * @brief  LTDC Clock Config for LCD DSI display.
+  * @param  hltdc  LTDC Handle
+  *         Being __weak it can be overwritten by the application
+  * @retval HAL_status
+  */
+__weak HAL_StatusTypeDef MX_LTDC_ClockConfig(LTDC_HandleTypeDef *hltdc)
+{
+  RCC_PeriphCLKInitTypeDef  PeriphClkInitStruct;
+
+  PeriphClkInitStruct.PeriphClockSelection   = RCC_PERIPHCLK_LTDC;
+  PeriphClkInitStruct.PLL3.PLL3M      = 5U;
+  PeriphClkInitStruct.PLL3.PLL3N      = 132U;
+  PeriphClkInitStruct.PLL3.PLL3P      = 2U;
+  PeriphClkInitStruct.PLL3.PLL3Q      = 2U;
+  PeriphClkInitStruct.PLL3.PLL3R      = 24U;
+  return HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
+}
+
+/**
+  * @brief  LTDC Clock Config for LCD 2 DPI display.
+  * @param  hltdc  LTDC Handle
+  *         Being __weak it can be overwritten by the application
+  * @retval HAL_status
+  */
+__weak HAL_StatusTypeDef MX_LTDC_ClockConfig2(LTDC_HandleTypeDef *hltdc)
+{
+  RCC_PeriphCLKInitTypeDef  PeriphClkInitStruct;
+
+  PeriphClkInitStruct.PeriphClockSelection    = RCC_PERIPHCLK_LTDC;
+  PeriphClkInitStruct.PLL3.PLL3M      = 1U;
+  PeriphClkInitStruct.PLL3.PLL3N      = 720U;
+  PeriphClkInitStruct.PLL3.PLL3P      = 2U;
+  PeriphClkInitStruct.PLL3.PLL3Q      = 2U;
+  PeriphClkInitStruct.PLL3.PLL3R      = 64U;
+  return HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
+}
+
+#if ((USE_HAL_LTDC_REGISTER_CALLBACKS == 1) || (USE_HAL_DSI_REGISTER_CALLBACKS == 1))
+/**
+  * @brief Default BSP LCD Msp Callbacks
+  * @param Instance BSP LCD Instance
+  * @retval BSP status
+  */
+int32_t BSP_LCD_RegisterDefaultMspCallbacks (uint32_t Instance)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+#if (USE_HAL_LTDC_REGISTER_CALLBACKS == 1)
+    if(HAL_LTDC_RegisterCallback(&hlcd_ltdc, HAL_LTDC_MSPINIT_CB_ID, LTDC_MspInit) != HAL_OK)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+    else
+    {
+      if(HAL_LTDC_RegisterCallback(&hlcd_ltdc, HAL_LTDC_MSPDEINIT_CB_ID, LTDC_MspDeInit) != HAL_OK)
+      {
+        ret = BSP_ERROR_PERIPH_FAILURE;
+      }
+    }
+#endif /* (USE_HAL_LTDC_REGISTER_CALLBACKS == 1) */
+
+#if (USE_HAL_DSI_REGISTER_CALLBACKS == 1)
+    if(ret == BSP_ERROR_NONE)
+    {
+      if(HAL_DSI_RegisterCallback(&hlcd_dsi, HAL_DSI_MSPINIT_CB_ID, DSI_MspInit) != HAL_OK)
+      {
+        ret = BSP_ERROR_PERIPH_FAILURE;
+      }
+      else
+      {
+        if(HAL_DSI_RegisterCallback(&hlcd_dsi, HAL_DSI_MSPDEINIT_CB_ID, DSI_MspDeInit) != HAL_OK)
+        {
+          ret = BSP_ERROR_PERIPH_FAILURE;
+        }
+      }
+    }
+#endif /* (USE_HAL_DSI_REGISTER_CALLBACKS == 1) */
+
+    Lcd_Ctx[Instance].IsMspCallbacksValid = 1;
+  }
+
+  return ret;
+}
+
+/**
+  * @brief BSP LCD Msp Callback registering
+  * @param Instance    LCD Instance
+  * @param CallBacks   pointer to LCD MspInit/MspDeInit functions
+  * @retval BSP status
+  */
+int32_t BSP_LCD_RegisterMspCallbacks (uint32_t Instance, BSP_LCD_Cb_t *CallBacks)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+#if (USE_HAL_LTDC_REGISTER_CALLBACKS == 1)
+    if(HAL_LTDC_RegisterCallback(&hlcd_ltdc, HAL_LTDC_MSPINIT_CB_ID, CallBacks->pMspLtdcInitCb) != HAL_OK)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+    else
+    {
+      if(HAL_LTDC_RegisterCallback(&hlcd_ltdc, HAL_LTDC_MSPDEINIT_CB_ID, CallBacks->pMspLtdcDeInitCb) != HAL_OK)
+      {
+        ret = BSP_ERROR_PERIPH_FAILURE;
+      }
+    }
+#endif /* (USE_HAL_LTDC_REGISTER_CALLBACKS == 1) */
+
+#if (USE_HAL_DSI_REGISTER_CALLBACKS == 1)
+    if(ret == BSP_ERROR_NONE)
+    {
+      if(HAL_DSI_RegisterCallback(&hlcd_dsi, HAL_DSI_MSPINIT_CB_ID, CallBacks->pMspDsiInitCb) != HAL_OK)
+      {
+        ret = BSP_ERROR_PERIPH_FAILURE;
+      }
+      else
+      {
+        if(HAL_DSI_RegisterCallback(&hlcd_dsi, HAL_DSI_MSPDEINIT_CB_ID, CallBacks->pMspDsiDeInitCb) != HAL_OK)
+        {
+          ret = BSP_ERROR_PERIPH_FAILURE;
+        }
+      }
+    }
+#endif /* (USE_HAL_DSI_REGISTER_CALLBACKS == 1) */
+
+    Lcd_Ctx[Instance].IsMspCallbacksValid = 1;
+  }
+
+  return ret;
+}
+#endif /*((USE_HAL_LTDC_REGISTER_CALLBACKS == 1) || (USE_HAL_DSI_REGISTER_CALLBACKS == 1)) */
+
+/**
+  * @brief  LTDC layer configuration.
+  * @param  Instance   LCD instance
+  * @param  LayerIndex Layer 0 or 1
+  * @param  Config     Layer configuration
+  * @retval HAL status
+  */
+int32_t BSP_LCD_ConfigLayer(uint32_t Instance, uint32_t LayerIndex, BSP_LCD_LayerConfig_t *Config)
+{
+  int32_t ret = BSP_ERROR_NONE;
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if (MX_LTDC_ConfigLayer(&hlcd_ltdc, LayerIndex, Config) != HAL_OK)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+  }
+  return ret;
+}
+
+/**
+  * @brief  Set the LCD Active Layer.
+  * @param  Instance    LCD Instance
+  * @param  LayerIndex  LCD layer index
+  * @retval BSP status
+  */
+int32_t BSP_LCD_SetActiveLayer(uint32_t Instance, uint32_t LayerIndex)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    Lcd_Ctx[Instance].ActiveLayer = LayerIndex;
+  }
+
+  return ret;
+}
+/**
+  * @brief  Gets the LCD Active LCD Pixel Format.
+  * @param  Instance    LCD Instance
+  * @param  PixelFormat Active LCD Pixel Format
+  * @retval BSP status
+  */
+int32_t BSP_LCD_GetPixelFormat(uint32_t Instance, uint32_t *PixelFormat)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    /* Only RGB565 format is supported */
+    *PixelFormat = Lcd_Ctx[Instance].PixelFormat;
+  }
+
+  return ret;
+}
+/**
+  * @brief  Control the LTDC reload
+  * @param  Instance    LCD Instance
+  * @param  ReloadType can be one of the following values
+  *         - BSP_LCD_RELOAD_NONE
+  *         - BSP_LCD_RELOAD_IMMEDIATE
+  *         - BSP_LCD_RELOAD_VERTICAL_BLANKING
+  * @retval BSP status
+  */
+int32_t BSP_LCD_Relaod(uint32_t Instance, uint32_t ReloadType)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else if(ReloadType == BSP_LCD_RELOAD_NONE)
+  {
+    Lcd_Ctx[Instance].ReloadEnable = 0U;
+  }
+  else if(HAL_LTDC_Reload (&hlcd_ltdc, ReloadType) != HAL_OK)
+  {
+    ret = BSP_ERROR_PERIPH_FAILURE;
+  }
+  else
+  {
+    Lcd_Ctx[Instance].ReloadEnable = 1U;
+  }
+
+  return ret;
+}
+
+/**
+  * @brief  Sets an LCD Layer visible
+  * @param  Instance    LCD Instance
+  * @param  LayerIndex  Visible Layer
+  * @param  State  New state of the specified layer
+  *          This parameter can be one of the following values:
+  *            @arg  ENABLE
+  *            @arg  DISABLE
+  * @retval BSP status
+  */
+int32_t BSP_LCD_SetLayerVisible(uint32_t Instance, uint32_t LayerIndex, FunctionalState State)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(State == ENABLE)
+    {
+      __HAL_LTDC_LAYER_ENABLE(&hlcd_ltdc, LayerIndex);
+    }
+    else
+    {
+      __HAL_LTDC_LAYER_DISABLE(&hlcd_ltdc, LayerIndex);
+    }
+
+    if(Lcd_Ctx[Instance].ReloadEnable == 1U)
+    {
+      __HAL_LTDC_RELOAD_IMMEDIATE_CONFIG(&hlcd_ltdc);
+    }
+  }
+
+  return ret;
+}
+
+/**
+  * @brief  Configures the transparency.
+  * @param  Instance      LCD Instance
+  * @param  LayerIndex    Layer foreground or background.
+  * @param  Transparency  Transparency
+  *           This parameter must be a number between Min_Data = 0x00 and Max_Data = 0xFF
+  * @retval BSP status
+  */
+int32_t BSP_LCD_SetTransparency(uint32_t Instance, uint32_t LayerIndex, uint8_t Transparency)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(Lcd_Ctx[Instance].ReloadEnable == 1U)
+    {
+      (void)HAL_LTDC_SetAlpha(&hlcd_ltdc, Transparency, LayerIndex);
+    }
+    else
+    {
+      (void)HAL_LTDC_SetAlpha_NoReload(&hlcd_ltdc, Transparency, LayerIndex);
+    }
+  }
+
+  return ret;
+}
+
+/**
+  * @brief  Sets an LCD layer frame buffer address.
+  * @param  Instance    LCD Instance
+  * @param  LayerIndex  Layer foreground or background
+  * @param  Address     New LCD frame buffer value
+  * @retval BSP status
+  */
+int32_t BSP_LCD_SetLayerAddress(uint32_t Instance, uint32_t LayerIndex, uint32_t Address)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(Lcd_Ctx[Instance].ReloadEnable == 1U)
+    {
+      (void)HAL_LTDC_SetAddress(&hlcd_ltdc, Address, LayerIndex);
+    }
+    else
+    {
+      (void)HAL_LTDC_SetAddress_NoReload(&hlcd_ltdc, Address, LayerIndex);
+    }
+  }
+
+  return ret;
+}
+
+/**
+  * @brief  Sets display window.
+  * @param  Instance    LCD Instance
+  * @param  LayerIndex  Layer index
+  * @param  Xpos   LCD X position
+  * @param  Ypos   LCD Y position
+  * @param  Width  LCD window width
+  * @param  Height LCD window height
+  * @retval BSP status
+  */
+int32_t BSP_LCD_SetLayerWindow(uint32_t Instance, uint16_t LayerIndex, uint16_t Xpos, uint16_t Ypos, uint16_t Width, uint16_t Height)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(Lcd_Ctx[Instance].ReloadEnable == 1U)
+    {
+      /* Reconfigure the layer size  and position */
+      (void)HAL_LTDC_SetWindowSize(&hlcd_ltdc, Width, Height, LayerIndex);
+      (void)HAL_LTDC_SetWindowPosition(&hlcd_ltdc, Xpos, Ypos, LayerIndex);
+    }
+    else
+    {
+      /* Reconfigure the layer size and position */
+      (void)HAL_LTDC_SetWindowSize_NoReload(&hlcd_ltdc, Width, Height, LayerIndex);
+      (void)HAL_LTDC_SetWindowPosition_NoReload(&hlcd_ltdc, Xpos, Ypos, LayerIndex);
+    }
+
+    Lcd_Ctx[Instance].XSize = Width;
+    Lcd_Ctx[Instance].YSize = Height;
+  }
+
+  return ret;
+}
+
+/**
+  * @brief  Configures and sets the color keying.
+  * @param  Instance    LCD Instance
+  * @param  LayerIndex  Layer foreground or background
+  * @param  Color       Color reference
+  * @retval BSP status
+  */
+int32_t BSP_LCD_SetColorKeying(uint32_t Instance, uint32_t LayerIndex, uint32_t Color)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(Lcd_Ctx[Instance].ReloadEnable == 1U)
+    {
+      /* Configure and Enable the color Keying for LCD Layer */
+      (void)HAL_LTDC_ConfigColorKeying(&hlcd_ltdc, Color, LayerIndex);
+      (void)HAL_LTDC_EnableColorKeying(&hlcd_ltdc, LayerIndex);
+    }
+    else
+    {
+      /* Configure and Enable the color Keying for LCD Layer */
+      (void)HAL_LTDC_ConfigColorKeying_NoReload(&hlcd_ltdc, Color, LayerIndex);
+      (void)HAL_LTDC_EnableColorKeying_NoReload(&hlcd_ltdc, LayerIndex);
+    }
+  }
+  return ret;
+}
+
+/**
+  * @brief  Disables the color keying.
+  * @param  Instance    LCD Instance
+  * @param  LayerIndex Layer foreground or background
+  * @retval BSP status
+  */
+int32_t BSP_LCD_ResetColorKeying(uint32_t Instance, uint32_t LayerIndex)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(Lcd_Ctx[Instance].ReloadEnable == 1U)
+    {
+      /* Disable the color Keying for LCD Layer */
+      (void)HAL_LTDC_DisableColorKeying(&hlcd_ltdc, LayerIndex);
+    }
+    else
+    {
+      /* Disable the color Keying for LCD Layer */
+      (void)HAL_LTDC_DisableColorKeying_NoReload(&hlcd_ltdc, LayerIndex);
+    }
+  }
+
+  return ret;
+}
+
+/**
+  * @brief  Gets the LCD X size.
+  * @param  Instance  LCD Instance
+  * @param  XSize     LCD width
+  * @retval BSP status
+  */
+int32_t BSP_LCD_GetXSize(uint32_t Instance, uint32_t *XSize)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else if(Lcd_Drv->GetXSize != NULL)
+  {
+    if(Lcd_Drv->GetXSize(Lcd_CompObj, XSize) != BSP_ERROR_NONE)
+    {
+      ret = BSP_ERROR_COMPONENT_FAILURE;
+    }
+  }
+
+  return ret;
+}
+
+/**
+  * @brief  Gets the LCD Y size.
+  * @param  Instance  LCD Instance
+  * @param  YSize     LCD Height
+  * @retval BSP status
+  */
+int32_t BSP_LCD_GetYSize(uint32_t Instance, uint32_t *YSize)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else if(Lcd_Drv->GetYSize != NULL)
+  {
+    if(Lcd_Drv->GetYSize(Lcd_CompObj, YSize) != BSP_ERROR_NONE)
+    {
+      ret = BSP_ERROR_COMPONENT_FAILURE;
+    }
+  }
+
+  return ret;
+}
+
+/**
+  * @brief  Switch On the display.
+  * @param  Instance    LCD Instance
+  * @retval BSP status
+  */
+int32_t BSP_LCD_DisplayOn(uint32_t Instance)
+{
+  int32_t ret;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(Lcd_Drv->DisplayOn(Lcd_CompObj) != BSP_ERROR_NONE)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+    else
+    {
+      ret = BSP_ERROR_NONE;
+    }
+  }
+
+  return ret;
+}
+
+/**
+  * @brief  Switch Off the display.
+  * @param  Instance    LCD Instance
+  * @retval BSP status
+  */
+int32_t BSP_LCD_DisplayOff(uint32_t Instance)
+{
+  int32_t ret;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(Lcd_Drv->DisplayOff(Lcd_CompObj) != BSP_ERROR_NONE)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+    else
+    {
+      ret = BSP_ERROR_NONE;
+    }
+  }
+
+  return ret;
+}
+
+/**
+  * @brief  Set the brightness value
+  * @param  Instance    LCD Instance
+  * @param  Brightness [00: Min (black), 100 Max]
+  * @retval BSP status
+  */
+int32_t BSP_LCD_SetBrightness(uint32_t Instance, uint32_t Brightness)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(Lcd_Drv->SetBrightness(Lcd_CompObj, Brightness) != BSP_ERROR_NONE)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+  }
+
+  return ret;
+}
+
+/**
+  * @brief  Set the brightness value
+  * @param  Instance    LCD Instance
+  * @param  Brightness [00: Min (black), 100 Max]
+  * @retval BSP status
+  */
+int32_t BSP_LCD_GetBrightness(uint32_t Instance, uint32_t *Brightness)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Instance >= LCD_INSTANCES_NBR)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(Lcd_Drv->GetBrightness(Lcd_CompObj, Brightness) != BSP_ERROR_NONE)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+  }
+
+  return ret;
+}
+
+/**
+  * @brief  Draws a bitmap picture loaded in the internal Flash in currently active layer.
+  * @param  Instance LCD Instance
+  * @param  Xpos Bmp X position in the LCD
+  * @param  Ypos Bmp Y position in the LCD
+  * @param  pBmp Pointer to Bmp picture address in the internal Flash.
+  * @retval BSP status
+  */
+int32_t BSP_LCD_DrawBitmap(uint32_t Instance, uint32_t Xpos, uint32_t Ypos, uint8_t *pBmp)
+{
+  int32_t ret = BSP_ERROR_NONE;
+  uint32_t index, width, height, bit_pixel;
+  uint32_t Address;
+  uint32_t input_color_mode;
+  uint8_t *pbmp;
+
+  /* Get bitmap data address offset */
+  index = (uint32_t)pBmp[10] + ((uint32_t)pBmp[11] << 8) + ((uint32_t)pBmp[12] << 16)  + ((uint32_t)pBmp[13] << 24);
+
+  /* Read bitmap width */
+  width = (uint32_t)pBmp[18] + ((uint32_t)pBmp[19] << 8) + ((uint32_t)pBmp[20] << 16)  + ((uint32_t)pBmp[21] << 24);
+
+  /* Read bitmap height */
+  height = (uint32_t)pBmp[22] + ((uint32_t)pBmp[23] << 8) + ((uint32_t)pBmp[24] << 16)  + ((uint32_t)pBmp[25] << 24);
+
+  /* Read bit/pixel */
+  bit_pixel = (uint32_t)pBmp[28] + ((uint32_t)pBmp[29] << 8);
+
+  /* Set the address */
+  Address = hlcd_ltdc.LayerCfg[Lcd_Ctx[Instance].ActiveLayer].FBStartAdress + (((Lcd_Ctx[Instance].XSize*Ypos) + Xpos)*Lcd_Ctx[Instance].BppFactor);
+
+  /* Get the layer pixel format */
+  if ((bit_pixel/8U) == 4U)
+  {
+    input_color_mode = DMA2D_INPUT_ARGB8888;
+  }
+  else if ((bit_pixel/8U) == 2U)
+  {
+    input_color_mode = DMA2D_INPUT_RGB565;
+  }
+  else
+  {
+    input_color_mode = DMA2D_INPUT_RGB888;
+  }
+
+  /* Bypass the bitmap header */
+  pbmp = pBmp + (index + (width * (height - 1U) * (bit_pixel/8U)));
+
+  /* Convert picture to ARGB8888 pixel format */
+  for(index=0; index < height; index++)
+  {
+    /* Pixel format conversion */
+    LL_ConvertLineToRGB(Instance, (uint32_t *)pbmp, (uint32_t *)Address, width, input_color_mode);
+
+    /* Increment the source and destination buffers */
+    Address+=  (Lcd_Ctx[Instance].XSize * Lcd_Ctx[Instance].BppFactor);
+    pbmp -= width*(bit_pixel/8U);
+  }
+
+  return ret;
+}
+/**
+  * @brief  Draw a horizontal line on LCD.
+  * @param  Instance LCD Instance.
+  * @param  Xpos X position.
+  * @param  Ypos Y position.
+  * @param  pData Pointer to RGB line data
+  * @param  Width Rectangle width.
+  * @param  Height Rectangle Height.
+  * @retval BSP status.
+  */
+int32_t BSP_LCD_FillRGBRect(uint32_t Instance, uint32_t Xpos, uint32_t Ypos, uint8_t *pData, uint32_t Width, uint32_t Height)
+{
+    uint32_t i;
+
+#if (USE_DMA2D_TO_FILL_RGB_RECT == 1)
+  uint32_t  Xaddress;
+  for(i = 0; i < Height; i++)
+  {
+    /* Get the line address */
+    Xaddress = hlcd_ltdc.LayerCfg[Lcd_Ctx[Instance].ActiveLayer].FBStartAdress + (Lcd_Ctx[Instance].BppFactor*(((Lcd_Ctx[Instance].XSize + i)*Ypos) + Xpos));
+
+    /* Write line */
+    if(Lcd_Ctx[Instance].PixelFormat == LCD_PIXEL_FORMAT_RGB565)
+    {
+      LL_ConvertLineToRGB(Instance, (uint32_t *)pData, (uint32_t *)Xaddress, Width, DMA2D_INPUT_RGB565);
+    }
+    else
+    {
+      LL_ConvertLineToRGB(Instance, (uint32_t *)pData, (uint32_t *)Xaddress, Width, DMA2D_INPUT_ARGB8888);
+    }
+    pData += Lcd_Ctx[Instance].BppFactor*Width;
+  }
+#else
+  uint32_t color, j;
+  for(i = 0; i < Height; i++)
+  {
+    for(j = 0; j < Width; j++)
+    {
+      color = *pData | (*(pData + 1) << 8) | (*(pData + 2) << 16) | (*(pData + 3) << 24);
+      BSP_LCD_WritePixel(Instance, Xpos + j, Ypos + i, color);
+      pData += Lcd_Ctx[Instance].BppFactor;
+    }
+  }
+#endif
+  return BSP_ERROR_NONE;
+}
+
+/**
+  * @brief  Draws an horizontal line in currently active layer.
+  * @param  Instance   LCD Instance
+  * @param  Xpos  X position
+  * @param  Ypos  Y position
+  * @param  Length  Line length
+  * @param  Color Pixel color
+  * @retval BSP status.
+  */
+int32_t BSP_LCD_DrawHLine(uint32_t Instance, uint32_t Xpos, uint32_t Ypos, uint32_t Length, uint32_t Color)
+{
+  uint32_t  Xaddress;
+
+  /* Get the line address */
+  Xaddress = hlcd_ltdc.LayerCfg[Lcd_Ctx[Instance].ActiveLayer].FBStartAdress + (Lcd_Ctx[Instance].BppFactor*((Lcd_Ctx[Instance].XSize*Ypos) + Xpos));
+
+  /* Write line */
+  if((Xpos + Length) > Lcd_Ctx[Instance].XSize)
+  {
+    Length = Lcd_Ctx[Instance].XSize - Xpos;
+  }
+  LL_FillBuffer(Instance, (uint32_t *)Xaddress, Length, 1, 0, Color);
+
+  return BSP_ERROR_NONE;
+}
+
+/**
+  * @brief  Draws a vertical line in currently active layer.
+  * @param  Instance   LCD Instance
+  * @param  Xpos  X position
+  * @param  Ypos  Y position
+  * @param  Length  Line length
+  * @param  Color Pixel color
+  * @retval BSP status.
+  */
+int32_t BSP_LCD_DrawVLine(uint32_t Instance, uint32_t Xpos, uint32_t Ypos, uint32_t Length, uint32_t Color)
+{
+  uint32_t  Xaddress;
+
+  /* Get the line address */
+  Xaddress = (hlcd_ltdc.LayerCfg[Lcd_Ctx[Instance].ActiveLayer].FBStartAdress) + (Lcd_Ctx[Instance].BppFactor*(Lcd_Ctx[Instance].XSize*Ypos + Xpos));
+
+  /* Write line */
+  if((Ypos + Length) > Lcd_Ctx[Instance].YSize)
+  {
+    Length = Lcd_Ctx[Instance].YSize - Ypos;
+  }
+ LL_FillBuffer(Instance, (uint32_t *)Xaddress, 1, Length, (Lcd_Ctx[Instance].XSize - 1U), Color);
+
+  return BSP_ERROR_NONE;
+}
+
+/**
+  * @brief  Draws a full rectangle in currently active layer.
+  * @param  Instance   LCD Instance
+  * @param  Xpos X position
+  * @param  Ypos Y position
+  * @param  Width Rectangle width
+  * @param  Height Rectangle height
+  * @param  Color Pixel color
+  * @retval BSP status.
+  */
+int32_t BSP_LCD_FillRect(uint32_t Instance, uint32_t Xpos, uint32_t Ypos, uint32_t Width, uint32_t Height, uint32_t Color)
+{
+  uint32_t  Xaddress;
+
+  /* Get the rectangle start address */
+  Xaddress = (hlcd_ltdc.LayerCfg[Lcd_Ctx[Instance].ActiveLayer].FBStartAdress) + (Lcd_Ctx[Instance].BppFactor*(Lcd_Ctx[Instance].XSize*Ypos + Xpos));
+
+  /* Fill the rectangle */
+ LL_FillBuffer(Instance, (uint32_t *)Xaddress, Width, Height, (Lcd_Ctx[Instance].XSize - Width), Color);
+
+  return BSP_ERROR_NONE;
+}
+
+/**
+  * @brief  Reads an LCD pixel.
+  * @param  Instance    LCD Instance
+  * @param  Xpos X position
+  * @param  Ypos Y position
+  * @param  Color RGB pixel color
+  * @retval BSP status
+  */
+int32_t BSP_LCD_ReadPixel(uint32_t Instance, uint32_t Xpos, uint32_t Ypos, uint32_t *Color)
+{
+  if(hlcd_ltdc.LayerCfg[Lcd_Ctx[Instance].ActiveLayer].PixelFormat == LTDC_PIXEL_FORMAT_ARGB8888)
+  {
+    /* Read data value from SDRAM memory */
+    *Color = *(__IO uint32_t*) (hlcd_ltdc.LayerCfg[Lcd_Ctx[Instance].ActiveLayer].FBStartAdress + (4U*(Ypos*Lcd_Ctx[Instance].XSize + Xpos)));
+  }
+  else /* if((hlcd_ltdc.LayerCfg[layer].PixelFormat == LTDC_PIXEL_FORMAT_RGB565) */
+  {
+    /* Read data value from SDRAM memory */
+    *Color = *(__IO uint16_t*) (hlcd_ltdc.LayerCfg[Lcd_Ctx[Instance].ActiveLayer].FBStartAdress + (2U*(Ypos*Lcd_Ctx[Instance].XSize + Xpos)));
+  }
+
+  return BSP_ERROR_NONE;
+}
+
+/**
+  * @brief  Draws a pixel on LCD.
+  * @param  Instance    LCD Instance
+  * @param  Xpos X position
+  * @param  Ypos Y position
+  * @param  Color Pixel color
+  * @retval BSP status
+  */
+int32_t BSP_LCD_WritePixel(uint32_t Instance, uint32_t Xpos, uint32_t Ypos, uint32_t Color)
+{
+  if(hlcd_ltdc.LayerCfg[Lcd_Ctx[Instance].ActiveLayer].PixelFormat == LTDC_PIXEL_FORMAT_ARGB8888)
+  {
+    /* Write data value to SDRAM memory */
+    *(__IO uint32_t*) (hlcd_ltdc.LayerCfg[Lcd_Ctx[Instance].ActiveLayer].FBStartAdress + (4U*(Ypos*Lcd_Ctx[Instance].XSize + Xpos))) = Color;
+  }
+  else
+  {
+    /* Write data value to SDRAM memory */
+    *(__IO uint16_t*) (hlcd_ltdc.LayerCfg[Lcd_Ctx[Instance].ActiveLayer].FBStartAdress + (2U*(Ypos*Lcd_Ctx[Instance].XSize + Xpos))) = Color;
+  }
+
+  return BSP_ERROR_NONE;
+}
+
 /**
   * @}
   */
 
-/** @defgroup STM32H747I_DISCOVERY_LCD_Private_Functions Private Functions
+/** @defgroup STM32H747I_DISCO_LCD_Private_Functions Private Functions
   * @{
   */
+/**
+  * @brief  Fills a buffer.
+  * @param  Instance LCD Instance
+  * @param  pDst Pointer to destination buffer
+  * @param  xSize Buffer width
+  * @param  ySize Buffer height
+  * @param  OffLine Offset
+  * @param  Color Color index
+  */
+static void LL_FillBuffer(uint32_t Instance, uint32_t *pDst, uint32_t xSize, uint32_t ySize, uint32_t OffLine, uint32_t Color)
+{
+  uint32_t output_color_mode, input_color = Color;
+
+  switch(Lcd_Ctx[Instance].PixelFormat)
+  {
+  case LCD_PIXEL_FORMAT_RGB565:
+    output_color_mode = DMA2D_OUTPUT_RGB565; /* RGB565 */
+    input_color = CONVERTRGB5652ARGB8888(Color);
+    break;
+  case LCD_PIXEL_FORMAT_RGB888:
+  default:
+    output_color_mode = DMA2D_OUTPUT_ARGB8888; /* ARGB8888 */
+    break;
+  }
+
+  /* Register to memory mode with ARGB8888 as color Mode */
+  hlcd_dma2d.Init.Mode         = DMA2D_R2M;
+  hlcd_dma2d.Init.ColorMode    = output_color_mode;
+  hlcd_dma2d.Init.OutputOffset = OffLine;
+
+  hlcd_dma2d.Instance = DMA2D;
+
+  /* DMA2D Initialization */
+  if(HAL_DMA2D_Init(&hlcd_dma2d) == HAL_OK)
+  {
+    if(HAL_DMA2D_ConfigLayer(&hlcd_dma2d, 1) == HAL_OK)
+    {
+      if (HAL_DMA2D_Start(&hlcd_dma2d, input_color, (uint32_t)pDst, xSize, ySize) == HAL_OK)
+      {
+        /* Polling For DMA transfer */
+        (void)HAL_DMA2D_PollForTransfer(&hlcd_dma2d, 25);
+      }
+    }
+  }
+}
 
 /**
-  * @brief  Draws a character on LCD.
-  * @param  Xpos: Line where to display the character shape
-  * @param  Ypos: Start column address
-  * @param  c: Pointer to the character data
+  * @brief  Converts a line to an RGB pixel format.
+  * @param  Instance LCD Instance
+  * @param  pSrc Pointer to source buffer
+  * @param  pDst Output color
+  * @param  xSize Buffer width
+  * @param  ColorMode Input color mode
+  */
+static void LL_ConvertLineToRGB(uint32_t Instance, uint32_t *pSrc, uint32_t *pDst, uint32_t xSize, uint32_t ColorMode)
+{
+  uint32_t output_color_mode;
+
+  switch(Lcd_Ctx[Instance].PixelFormat)
+  {
+  case LCD_PIXEL_FORMAT_RGB565:
+    output_color_mode = DMA2D_OUTPUT_RGB565; /* RGB565 */
+    break;
+  case LCD_PIXEL_FORMAT_RGB888:
+  default:
+    output_color_mode = DMA2D_OUTPUT_ARGB8888; /* ARGB8888 */
+    break;
+  }
+
+  /* Configure the DMA2D Mode, Color Mode and output offset */
+  hlcd_dma2d.Init.Mode         = DMA2D_M2M_PFC;
+  hlcd_dma2d.Init.ColorMode    = output_color_mode;
+  hlcd_dma2d.Init.OutputOffset = 0;
+
+  /* Foreground Configuration */
+  hlcd_dma2d.LayerCfg[1].AlphaMode = DMA2D_NO_MODIF_ALPHA;
+  hlcd_dma2d.LayerCfg[1].InputAlpha = 0xFF;
+  hlcd_dma2d.LayerCfg[1].InputColorMode = ColorMode;
+  hlcd_dma2d.LayerCfg[1].InputOffset = 0;
+
+  hlcd_dma2d.Instance = DMA2D;
+
+  /* DMA2D Initialization */
+  if(HAL_DMA2D_Init(&hlcd_dma2d) == HAL_OK)
+  {
+    if(HAL_DMA2D_ConfigLayer(&hlcd_dma2d, 1) == HAL_OK)
+    {
+      if (HAL_DMA2D_Start(&hlcd_dma2d, (uint32_t)pSrc, (uint32_t)pDst, xSize, 1) == HAL_OK)
+      {
+        /* Polling For DMA transfer */
+        (void)HAL_DMA2D_PollForTransfer(&hlcd_dma2d, 50);
+      }
+    }
+  }
+}
+
+/*******************************************************************************
+                       BSP Routines:
+                                       LTDC
+                                       DMA2D
+                                       DSI
+*******************************************************************************/
+/**
+  * @brief  Initialize the BSP LTDC Msp.
+  * @param  hltdc  LTDC handle
   * @retval None
   */
-static void DrawChar(uint16_t Xpos, uint16_t Ypos, const uint8_t *c)
+static void LTDC_MspInit(LTDC_HandleTypeDef *hltdc)
 {
-  uint32_t i = 0, j = 0;
-  uint16_t height, width;
-  uint8_t  offset;
-  uint8_t  *pchar;
-  uint32_t line;
-
-  height = DrawProp[ActiveLayer].pFont->Height;
-  width  = DrawProp[ActiveLayer].pFont->Width;
-
-  offset =  8 *((width + 7)/8) -  width ;
-
-  for(i = 0; i < height; i++)
+  if(hltdc->Instance == LTDC)
   {
-    pchar = ((uint8_t *)c + (width + 7)/8 * i);
+    /** Enable the LTDC clock */
+    __HAL_RCC_LTDC_CLK_ENABLE();
 
-    switch(((width + 7)/8))
+
+    /** Toggle Sw reset of LTDC IP */
+    __HAL_RCC_LTDC_FORCE_RESET();
+    __HAL_RCC_LTDC_RELEASE_RESET();
+  }
+}
+
+/**
+  * @brief  De-Initializes the BSP LTDC Msp
+  * @param  hltdc  LTDC handle
+  * @retval None
+  */
+static void LTDC_MspDeInit(LTDC_HandleTypeDef *hltdc)
+{
+  if(hltdc->Instance == LTDC)
+  {
+    /** Force and let in reset state LTDC */
+    __HAL_RCC_LTDC_FORCE_RESET();
+
+    /** Disable the LTDC */
+    __HAL_RCC_LTDC_CLK_DISABLE();
+  }
+}
+
+/**
+  * @brief  Initialize the BSP DMA2D Msp.
+  * @param  hdma2d  DMA2D handle
+  * @retval None
+  */
+static void DMA2D_MspInit(DMA2D_HandleTypeDef *hdma2d)
+{
+  if(hdma2d->Instance == DMA2D)
+  {
+    /** Enable the DMA2D clock */
+    __HAL_RCC_DMA2D_CLK_ENABLE();
+
+    /** Toggle Sw reset of DMA2D IP */
+    __HAL_RCC_DMA2D_FORCE_RESET();
+    __HAL_RCC_DMA2D_RELEASE_RESET();
+  }
+}
+
+/**
+  * @brief  De-Initializes the BSP DMA2D Msp
+  * @param  hdma2d  DMA2D handle
+  * @retval None
+  */
+static void DMA2D_MspDeInit(DMA2D_HandleTypeDef *hdma2d)
+{
+  if(hdma2d->Instance == DMA2D)
+  {
+    /** Disable IRQ of DMA2D IP */
+    HAL_NVIC_DisableIRQ(DMA2D_IRQn);
+
+    /** Force and let in reset state DMA2D */
+    __HAL_RCC_DMA2D_FORCE_RESET();
+
+    /** Disable the DMA2D */
+    __HAL_RCC_DMA2D_CLK_DISABLE();
+  }
+}
+
+/**
+  * @brief  Initialize the BSP DSI Msp.
+  * @param  hdsi  DSI handle
+  * @retval None
+  */
+static void DSI_MspInit(DSI_HandleTypeDef *hdsi)
+{
+  if(hdsi->Instance == DSI)
+  {
+    /** Enable DSI Host and wrapper clocks */
+    __HAL_RCC_DSI_CLK_ENABLE();
+
+    /** Soft Reset the DSI Host and wrapper */
+    __HAL_RCC_DSI_FORCE_RESET();
+    __HAL_RCC_DSI_RELEASE_RESET();
+  }
+}
+
+/**
+  * @brief  De-Initializes the BSP DSI Msp
+  * @param  hdsi  DSI handle
+  * @retval None
+  */
+static void DSI_MspDeInit(DSI_HandleTypeDef *hdsi)
+{
+  if(hdsi->Instance == DSI)
+  {
+    /** Disable IRQ of DSI IP */
+    HAL_NVIC_DisableIRQ(DSI_IRQn);
+
+    /** Force and let in reset state the DSI Host + Wrapper IPs */
+    __HAL_RCC_DSI_FORCE_RESET();
+
+    /** Disable the DSI Host and Wrapper clocks */
+    __HAL_RCC_DSI_CLK_DISABLE();
+  }
+}
+
+/**
+  * @brief  DCS or Generic short/long write command
+  * @param  ChannelNbr Virtual channel ID
+  * @param  Reg Register to be written
+  * @param  pData pointer to a buffer of data to be write
+  * @param  Size To precise command to be used (short or long)
+  * @retval BSP status
+  */
+static int32_t DSI_IO_Write(uint16_t ChannelNbr, uint16_t Reg, uint8_t *pData, uint16_t Size)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(Size <= 1U)
+  {
+    if(HAL_DSI_ShortWrite(&hlcd_dsi, ChannelNbr, DSI_DCS_SHORT_PKT_WRITE_P1, Reg, (uint32_t)pData[Size]) != HAL_OK)
     {
+      ret = BSP_ERROR_BUS_FAILURE;
+    }
+  }
+  else
+  {
+    if(HAL_DSI_LongWrite(&hlcd_dsi, ChannelNbr, DSI_DCS_LONG_PKT_WRITE, Size, (uint32_t)Reg, pData) != HAL_OK)
+    {
+      ret = BSP_ERROR_BUS_FAILURE;
+    }
+  }
 
-    case 1:
-      line =  pchar[0];
-      break;
+  return ret;
+}
 
-    case 2:
-      line =  (pchar[0]<< 8) | pchar[1];
-      break;
+/**
+  * @brief  DCS or Generic read command
+  * @param  ChannelNbr Virtual channel ID
+  * @param  Reg Register to be read
+  * @param  pData pointer to a buffer to store the payload of a read back operation.
+  * @param  Size  Data size to be read (in byte).
+  * @retval BSP status
+  */
+static int32_t DSI_IO_Read(uint16_t ChannelNbr, uint16_t Reg, uint8_t *pData, uint16_t Size)
+{
+  int32_t ret = BSP_ERROR_NONE;
 
-    case 3:
-    default:
-      line =  (pchar[0]<< 16) | (pchar[1]<< 8) | pchar[2];
-      break;
+  if(HAL_DSI_Read(&hlcd_dsi, ChannelNbr, pData, Size, DSI_DCS_SHORT_PKT_READ, Reg, pData) != HAL_OK)
+  {
+    ret = BSP_ERROR_BUS_FAILURE;
+  }
+
+  return ret;
+}
+
+#if (USE_LCD_CTRL_ADV7533 > 0)
+/**
+  * @brief  Get HDMI DSI video mode timings for selected format
+  * @param  Format   Display format
+  * @param  Timing   pointer to timing structure
+  * @retval None
+  */
+static void LCD_Get_HDMI_VideoModeTiming(uint32_t Format, LCD_HDMI_Timing_t *Timing)
+{
+  if(Format == HDMI_FORMAT_720_480)
+  {
+    Timing->HSYNC = 62U;
+    Timing->HBP   = 60U;
+    Timing->HFP   = 30U;
+    Timing->VSYNC = 6U;
+    Timing->VBP   = 19U;
+    Timing->VFP   = 9U;
+    Timing->HACT  = 720U;
+    Timing->VACT  = 480U;
+  }
+  else /* (Format == HDMI_FORMAT_720_576) */
+  {
+    Timing->HSYNC = 64U;
+    Timing->HBP   = 68U;
+    Timing->HFP   = 12U;
+    Timing->VSYNC = 5U;
+    Timing->VBP   = 39U;
+    Timing->VFP   = 5U;
+    Timing->HACT  = 720U;
+    Timing->VACT  = 576U;
+  }
+  Timing->ClockLaneHS2LPTime = 0x14;
+  Timing->ClockLaneLP2HSTime = 0x14;
+  Timing->DataLaneHS2LPTime = 0x0A;
+  Timing->DataLaneLP2HSTime = 0x0A;
+  Timing->DataLaneMaxReadTime = 0x00;
+  Timing->StopWaitTime = 0x00;
+}
+
+/**
+  * @brief  LTDC initialization
+  * @param  Timing   pointer to timing structure
+  * @retval None
+  */
+static void LTDC_HDMI_Init(LCD_HDMI_Timing_t *Timing)
+{
+  /* Background value */
+  hlcd_ltdc.Init.Backcolor.Blue = 0x00;
+  hlcd_ltdc.Init.Backcolor.Green = 0xFF;
+  hlcd_ltdc.Init.Backcolor.Red = 0xFF;
+
+  hlcd_ltdc.Init.HorizontalSync     = Timing->HSYNC - 1;
+  hlcd_ltdc.Init.AccumulatedHBP     = Timing->HSYNC + Timing->HBP - 1;
+  hlcd_ltdc.Init.AccumulatedActiveW = Timing->HSYNC + Timing->HACT + Timing->HBP - 1;
+  hlcd_ltdc.Init.TotalWidth         = Timing->HSYNC + Timing->HACT + Timing->HBP + Timing->HFP - 1;
+  hlcd_ltdc.Init.VerticalSync       = Timing->VSYNC - 1;
+  hlcd_ltdc.Init.AccumulatedVBP     = Timing->VSYNC + Timing->VBP - 1;
+  hlcd_ltdc.Init.AccumulatedActiveH = Timing->VSYNC + Timing->VACT + Timing->VBP - 1;
+  hlcd_ltdc.Init.TotalHeigh         = Timing->VSYNC + Timing->VACT + Timing->VBP + Timing->VFP - 1;
+
+  /* Polarity */
+  hlcd_ltdc.Init.HSPolarity = LTDC_HSPOLARITY_AL;
+  hlcd_ltdc.Init.VSPolarity = LTDC_VSPOLARITY_AL;
+  hlcd_ltdc.Init.DEPolarity = LTDC_DEPOLARITY_AL;
+  hlcd_ltdc.Init.PCPolarity = LTDC_PCPOLARITY_IPC;
+  hlcd_ltdc.Instance = LTDC;
+
+  /* Initialize the LTDC */
+  (void)HAL_LTDC_Init(&hlcd_ltdc);
+}
+
+/**
+  * @brief  Register Bus IOs if component ID is OK
+  * @retval error status
+  */
+static int32_t ADV7533_Probe(void)
+{
+  int32_t ret;
+  uint32_t id;
+  ADV7533_IO_t              IOCtx;
+  static ADV7533_Object_t         ADV7533Obj;
+
+  /* Configure the audio driver */
+  IOCtx.Address     = ADV7533_MAIN_I2C_ADDR;
+  IOCtx.Init        = BSP_I2C4_Init;
+  IOCtx.DeInit      = BSP_I2C4_DeInit;
+  IOCtx.ReadReg     = BSP_I2C4_ReadReg;
+  IOCtx.WriteReg    = BSP_I2C4_WriteReg;
+  IOCtx.GetTick     = BSP_GetTick;
+
+  if(ADV7533_RegisterBusIO (&ADV7533Obj, &IOCtx) != ADV7533_OK)
+  {
+    ret = BSP_ERROR_BUS_FAILURE;
+  }
+  else if(ADV7533_ReadID(&ADV7533Obj, &id) != ADV7533_OK)
+  {
+    ret = BSP_ERROR_COMPONENT_FAILURE;
+  }
+  else if(id != ADV7533_ID)
+  {
+    ret = BSP_ERROR_UNKNOWN_COMPONENT;
+  }
+  else
+  {
+    Lcd_Drv = (LCD_Drv_t *) &ADV7533_LCD_Driver;
+    Lcd_CompObj = &ADV7533Obj;
+    if(Lcd_Drv->Init(Lcd_CompObj, 0, 0) != ADV7533_OK)
+    {
+      ret = BSP_ERROR_COMPONENT_FAILURE;
+    }
+    else if(ADV7533_Configure(Lcd_CompObj, 2)!= ADV7533_OK)
+    {
+      ret = BSP_ERROR_COMPONENT_FAILURE;
+    }
+    else
+    {
+      ret = BSP_ERROR_NONE;
+    }
+  }
+
+  return ret;
+}
+#endif /*USE_LCD_CTRL_ADV7533 */
+#if (USE_LCD_CTRL_OTM8009A > 0)
+/**
+  * @brief  Register Bus IOs if component ID is OK
+  * @retval error status
+  */
+static int32_t OTM8009A_Probe(uint32_t ColorCoding, uint32_t Orientation)
+{
+  int32_t ret;
+  uint32_t id;
+  OTM8009A_IO_t              IOCtx;
+  static OTM8009A_Object_t   OTM8009AObj;
+
+  /* Configure the audio driver */
+  IOCtx.Address     = 0;
+  IOCtx.GetTick     = BSP_GetTick;
+  IOCtx.WriteReg    = DSI_IO_Write;
+  IOCtx.ReadReg     = DSI_IO_Read;
+
+  if(OTM8009A_RegisterBusIO(&OTM8009AObj, &IOCtx) != OTM8009A_OK)
+  {
+    ret = BSP_ERROR_BUS_FAILURE;
+  }
+  else
+  {
+    Lcd_CompObj = &OTM8009AObj;
+
+    if(OTM8009A_ReadID(Lcd_CompObj, &id) != OTM8009A_OK)
+    {
+      ret = BSP_ERROR_COMPONENT_FAILURE;
     }
 
-    for (j = 0; j < width; j++)
+    else
     {
-      if(line & (1 << (width- j + offset- 1)))
+      Lcd_Drv = (LCD_Drv_t *)(void *) &OTM8009A_LCD_Driver;
+      if(Lcd_Drv->Init(Lcd_CompObj, ColorCoding, Orientation) != OTM8009A_OK)
       {
-        BSP_LCD_DrawPixel((Xpos + j), Ypos, DrawProp[ActiveLayer].TextColor);
+        ret = BSP_ERROR_COMPONENT_FAILURE;
       }
       else
       {
-        BSP_LCD_DrawPixel((Xpos + j), Ypos, DrawProp[ActiveLayer].BackColor);
-      }
-    }
-    Ypos++;
-  }
-}
-
-/**
-  * @brief  Fills a triangle (between 3 points).
-  * @param  x1: Point 1 X position
-  * @param  y1: Point 1 Y position
-  * @param  x2: Point 2 X position
-  * @param  y2: Point 2 Y position
-  * @param  x3: Point 3 X position
-  * @param  y3: Point 3 Y position
-  * @retval None
-  */
-static void FillTriangle(uint16_t x1, uint16_t x2, uint16_t x3, uint16_t y1, uint16_t y2, uint16_t y3)
-{
-  int16_t deltax = 0, deltay = 0, x = 0, y = 0, xinc1 = 0, xinc2 = 0,
-  yinc1 = 0, yinc2 = 0, den = 0, num = 0, numadd = 0, numpixels = 0,
-  curpixel = 0;
-
-  deltax = ABS(x2 - x1);        /* The difference between the x's */
-  deltay = ABS(y2 - y1);        /* The difference between the y's */
-  x = x1;                       /* Start x off at the first pixel */
-  y = y1;                       /* Start y off at the first pixel */
-
-  if (x2 >= x1)                 /* The x-values are increasing */
-  {
-    xinc1 = 1;
-    xinc2 = 1;
-  }
-  else                          /* The x-values are decreasing */
-  {
-    xinc1 = -1;
-    xinc2 = -1;
-  }
-
-  if (y2 >= y1)                 /* The y-values are increasing */
-  {
-    yinc1 = 1;
-    yinc2 = 1;
-  }
-  else                          /* The y-values are decreasing */
-  {
-    yinc1 = -1;
-    yinc2 = -1;
-  }
-
-  if (deltax >= deltay)         /* There is at least one x-value for every y-value */
-  {
-    xinc1 = 0;                  /* Don't change the x when numerator >= denominator */
-    yinc2 = 0;                  /* Don't change the y for every iteration */
-    den = deltax;
-    num = deltax / 2;
-    numadd = deltay;
-    numpixels = deltax;         /* There are more x-values than y-values */
-  }
-  else                          /* There is at least one y-value for every x-value */
-  {
-    xinc2 = 0;                  /* Don't change the x for every iteration */
-    yinc1 = 0;                  /* Don't change the y when numerator >= denominator */
-    den = deltay;
-    num = deltay / 2;
-    numadd = deltax;
-    numpixels = deltay;         /* There are more y-values than x-values */
-  }
-
-  for (curpixel = 0; curpixel <= numpixels; curpixel++)
-  {
-    BSP_LCD_DrawLine(x, y, x3, y3);
-
-    num += numadd;              /* Increase the numerator by the top of the fraction */
-    if (num >= den)             /* Check if numerator >= denominator */
-    {
-      num -= den;               /* Calculate the new numerator value */
-      x += xinc1;               /* Change the x as appropriate */
-      y += yinc1;               /* Change the y as appropriate */
-    }
-    x += xinc2;                 /* Change the x as appropriate */
-    y += yinc2;                 /* Change the y as appropriate */
-  }
-}
-
-/**
-  * @brief  Fills a buffer.
-  * @param  LayerIndex: Layer index
-  * @param  pDst: Pointer to destination buffer
-  * @param  xSize: Buffer width
-  * @param  ySize: Buffer height
-  * @param  OffLine: Offset
-  * @param  ColorIndex: Color index
-  * @retval None
-  */
-static void LL_FillBuffer(uint32_t LayerIndex, void *pDst, uint32_t xSize, uint32_t ySize, uint32_t OffLine, uint32_t ColorIndex)
-{
-  /* Register to memory mode with ARGB8888 as color Mode */
-  hdma2d_discovery.Init.Mode         = DMA2D_R2M;
-  hdma2d_discovery.Init.ColorMode    = DMA2D_OUTPUT_ARGB8888;
-  hdma2d_discovery.Init.OutputOffset = OffLine;
-
-  hdma2d_discovery.Instance = DMA2D;
-
-  /* DMA2D Initialization */
-  if(HAL_DMA2D_Init(&hdma2d_discovery) == HAL_OK)
-  {
-    if(HAL_DMA2D_ConfigLayer(&hdma2d_discovery, 1) == HAL_OK)
-    {
-      if (HAL_DMA2D_Start(&hdma2d_discovery, ColorIndex, (uint32_t)pDst, xSize, ySize) == HAL_OK)
-      {
-        /* Polling For DMA transfer */
-        HAL_DMA2D_PollForTransfer(&hdma2d_discovery, 25);
+        ret = BSP_ERROR_NONE;
       }
     }
   }
+  return ret;
 }
-
-/**
-  * @brief  Converts a line to an ARGB8888 pixel format.
-  * @param  pSrc: Pointer to source buffer
-  * @param  pDst: Output color
-  * @param  xSize: Buffer width
-  * @param  ColorMode: Input color mode
-  * @retval None
-  */
-static void LL_ConvertLineToARGB8888(void *pSrc, void *pDst, uint32_t xSize, uint32_t ColorMode)
-{
-  /* Configure the DMA2D Mode, Color Mode and output offset */
-  hdma2d_discovery.Init.Mode         = DMA2D_M2M_PFC;
-  hdma2d_discovery.Init.ColorMode    = DMA2D_OUTPUT_ARGB8888;
-  hdma2d_discovery.Init.OutputOffset = 0;
-
-  /* Foreground Configuration */
-  hdma2d_discovery.LayerCfg[1].AlphaMode = DMA2D_NO_MODIF_ALPHA;
-  hdma2d_discovery.LayerCfg[1].InputAlpha = 0xFF;
-  hdma2d_discovery.LayerCfg[1].InputColorMode = ColorMode;
-  hdma2d_discovery.LayerCfg[1].InputOffset = 0;
-
-  hdma2d_discovery.Instance = DMA2D;
-
-  /* DMA2D Initialization */
-  if(HAL_DMA2D_Init(&hdma2d_discovery) == HAL_OK)
-  {
-    if(HAL_DMA2D_ConfigLayer(&hdma2d_discovery, 1) == HAL_OK)
-    {
-      if (HAL_DMA2D_Start(&hdma2d_discovery, (uint32_t)pSrc, (uint32_t)pDst, xSize, 1) == HAL_OK)
-      {
-        /* Polling For DMA transfer */
-        HAL_DMA2D_PollForTransfer(&hdma2d_discovery, 25);
-      }
-    }
-  }
-}
-
+#endif /* USE_LCD_CTRL_OTM8009A */
 /**
   * @}
   */

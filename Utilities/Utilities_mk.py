@@ -2,10 +2,13 @@
 
 def getSrcs(wk):
     return [
-        'Utilities/Log/lcd_log.c'
+        'Utilities/Lcd_Trace/lcd_trace.c',
+        'Utilities/Basic_GUI/basic_gui.c'
     ]
     
 def getIncs(wk):
     return [
-        'Utilities'
+        'Utilities/Lcd_Trace',
+        'Utilities/Basic_GUI',
+        'Utilities/Fonts'
     ]

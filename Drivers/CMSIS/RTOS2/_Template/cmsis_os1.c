@@ -25,8 +25,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <string.h>
-
-#include "cmsis_os.h.temp"
+#include "cmsis_os.h"
 
 #if (osCMSIS >= 0x20000U)
 

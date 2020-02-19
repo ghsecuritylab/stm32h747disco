@@ -20,18 +20,39 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include "Log/lcd_log.h"
+#ifdef USE_LCD
+#include "lcd_trace.h"
+#endif
 #include "App.h"
-
+#include <stdlib.h>
+#include "LcdLog.h"
+#include "sd_diskio_dma.h"
+#include "ff_gen_drv.h"
+#include "SDFatFs.h"
 
 /* Private typedef -----------------------------------------------------------*/
+//typedef enum {
+//  APPLICATION_IDLE = 0,
+//  APPLICATION_RUNNING,
+//  APPLICATION_SD_UNPLUGGED,
+//  APPLICATION_STATUS_CHANGED,
+//}FS_FileOperationsTypeDef;
 /* Private define ------------------------------------------------------------*/
 #define HSEM_ID_0 (0U) /* HW semaphore 0*/
 #define semtstSTACK_SIZE configMINIMAL_STACK_SIZE
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 osSemaphoreId osSemaphore;
+uint8_t pData[512];
+char SDPath[4];
+//static uint8_t isInitialized = 0;
+FS_FileOperationsTypeDef Appli_statetmp = APPLICATION_IDLE;
+FATFS SDFatFs;  /* File system object for SD card logical drive */
+FIL MyFile;     /* File object */
+ALIGN_32BYTES(uint8_t rtext[96]);
+uint8_t workBuffer[_MAX_SS];
 
+/* Private functions ---------------------------------------------------------*/
 #if SIMPLE_TASK
 /* Private function prototypes -----------------------------------------------*/
 static void CORE1_SemaphoreCoreSync(void const *argument);
@@ -41,8 +62,8 @@ static void CPU_CACHE_Enable(void);
 static void Error_Handler(void);
 static void MPU_Config(void);
 static void BSP_Config(void);
+//static void SD_Config(void);
 
-/* Private functions ---------------------------------------------------------*/
 
 /**
   * @brief  Main program
@@ -104,15 +125,32 @@ int main(void)
 
    /* Add Cortex-M7 user application code here */ 
   /* Configure LED1 */
+
   BSP_Config();
+
+  SDFatFs_Init();
+//  SD_Config();
+//  BSP_QSPI_Init();
+
+#if 0
+  QSPI_Info flashInfo;
+  BSP_QSPI_GetInfo(&flashInfo);
+
+  uint32_t WRITE_READ_ADDR = 0x1000;
+
+  BSP_QSPI_Read(pData, WRITE_READ_ADDR, sizeof(pData));
+  memset(pData, 0x45, sizeof(pData));
+  BSP_QSPI_Erase_Block(WRITE_READ_ADDR);
+  BSP_QSPI_Write(pData, WRITE_READ_ADDR, sizeof(pData));
+#endif
+
+  APP_init();
 
 #if SIMPLE_TASK
   /* Create the Thread that toggle LED1 */
   osThreadDef(CORE1_Thread, CORE1_SemaphoreCoreSync, osPriorityNormal, 0, semtstSTACK_SIZE);
   osThreadCreate(osThread(CORE1_Thread), (void *) osSemaphore);
 #endif
-
-  APP_Init();
 
   /* Start scheduler */
   osKernelStart();
@@ -133,11 +171,14 @@ static void CORE1_SemaphoreCoreSync(void const *argument)
   for(;;)
   {
     /*Take Hw Semaphore 0*/
-    HAL_HSEM_FastTake(HSEM_ID_0);
-    LCD_UsrLog("  test\n");
-    osDelay(500);
+//    HAL_HSEM_FastTake(HSEM_ID_0);
+	 LCDLog_RLog(0, "Test %s", "LCDLog");
+	 LCDLog_RLog(1, "Test %s", "1");
+	 LCDLog_RLog(2, "Test %s", "2");
+	 LCDLog_RLog(3, "Test %s", "3");
+	 osDelay(500);
     /*Release Hw Semaphore 0 in order to notify the CPU2(CM4)*/
-    HAL_HSEM_Release(HSEM_ID_0,0);
+//    HAL_HSEM_Release(HSEM_ID_0,0);
   }
 }
 #endif
@@ -148,30 +189,189 @@ static void CORE1_SemaphoreCoreSync(void const *argument)
   * @param  None
   * @retval None
   */
-static void BSP_Config(void)
-{
+static void BSP_Config(void) {
 #ifdef USE_LCD
 
-  /* Initialize the LCD */
-  BSP_LCD_Init();
+	/* Initialize the LCD */
+	BSP_LCD_Init(0, LCD_ORIENTATION_LANDSCAPE);
 
-  BSP_LCD_LayerDefaultInit(0, LCD_FB_START_ADDRESS);
+	GUI_SetFuncDriver(&LCD_Driver);
+	GUI_Clear(GUI_COLOR_DARKGRAY);
 
-  /* Initialize LCD Log module */
-  LCD_LOG_Init();
+	GUI_SetTextColor(GUI_COLOR_WHITE);
+	GUI_SetFont(&Font20);
+	GUI_SetBackColor(GUI_COLOR_DARKGRAY);
+//	GUI_DisplayChar(20, 20, 'A');
 
-  /* Show Header and Footer texts */
-  LCD_LOG_SetHeader((uint8_t *)"Webserver Application");
-  LCD_LOG_SetFooter((uint8_t *)"STM32H747I-DISCO board");
 
-  LCD_UsrLog("  State: Ethernet Initialization ...\n");
+
+//	BSP_LCD_LayerDefaultInit(0, LCD_FB_START_ADDRESS);
+
+	/* Initialize LCD Log module */
+//	UTIL_LCD_TRACE_Init();
+
+	/* Show Header and Footer texts */
+//	UTIL_LCD_TRACE_SetHeader((uint8_t*) "Webserver Application");
+//	UTIL_LCD_TRACE_SetFooter((uint8_t*) "STM32H747I-DISCO board");
+
+	LCDLog_RLog(0, "State: Ethernet Initialization ...");
 #endif
 
- BSP_LED_Init(LED1);
- BSP_LED_Init(LED2);
+	BSP_LED_Init(LED1);
+	BSP_LED_Init(LED2);
+	BSP_LED_Init(LED3);
+	BSP_LED_Init(LED4);
 
 }
 
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+//	Appli_state = APPLICATION_STATUS_CHANGED;
+}
+
+/**
+  * @brief  Init the SDIO/SDMMC device
+  * @param  none
+  * @retval None
+  */
+#if 0
+static void SD_Initialize(void)
+{
+  if (isInitialized == 0)
+  {
+    BSP_SD_Init(0);
+    BSP_SD_DetectITConfig(0);
+
+    if(BSP_SD_IsDetected(0))
+    {
+      isInitialized = 1;
+    }
+  }
+}
+
+/**
+ * @brief  Compares two buffers.
+ * @param  pBuffer1, pBuffer2: buffers to be compared.
+ * @param  BufferLength: buffer's length
+ * @retval 1: pBuffer identical to pBuffer1
+ *         0: pBuffer differs from pBuffer1
+ */
+static uint8_t Buffercmp(uint8_t *pBuffer1, uint8_t *pBuffer2,
+		uint32_t BufferLength) {
+	while (BufferLength--) {
+		if (*pBuffer1 != *pBuffer2) {
+			return 1;
+		}
+
+		pBuffer1++;
+		pBuffer2++;
+	}
+	return 0;
+}
+
+static void FS_FileOperations(void) {
+	FRESULT res; /* FatFs function common result code */
+	uint32_t byteswritten, bytesread; /* File write/read counts */
+	uint8_t wtext[] =
+			"[STM32H747_Eval/CORE_CM7]:This is STM32 working with FatFs + DMA"; /* File write buffer */
+
+	/* Register the file system object to the FatFs module */
+	if (f_mount(&SDFatFs, (TCHAR const*) SDPath, 0) == FR_OK) {
+		/* Create and Open a new text file object with write access */
+		if (f_open(&MyFile, "STM32.TXT", FA_CREATE_ALWAYS | FA_WRITE)
+				== FR_OK) {
+			/* Write data to the text file */
+			res = f_write(&MyFile, wtext, sizeof(wtext), (void*) &byteswritten);
+
+			if ((byteswritten > 0) && (res == FR_OK)) {
+				/* Close the open text file */
+				f_close(&MyFile);
+
+				/* Open the text file object with read access */
+				if (f_open(&MyFile, "STM32.TXT", FA_READ) == FR_OK) {
+					/* Read data from the text file */
+					res = f_read(&MyFile, rtext, sizeof(rtext),
+							(void*) &bytesread);
+
+					if ((bytesread > 0) && (res == FR_OK)) {
+						/* Close the open text file */
+						f_close(&MyFile);
+
+						/* Compare read data with the expected data */
+						if (Buffercmp(rtext, wtext, byteswritten) == 0) {
+							/* Success of the demo: no error occurrence */
+							BSP_LED_On(LED_GREEN);
+							return;
+						}
+					}
+				}
+			}
+		}
+	}
+	/* Error */
+	Error_Handler();
+}
+
+
+void SD_Config(void) {
+
+	BSP_LED_Init(LED_GREEN);
+	BSP_LED_Init(LED_RED);
+
+	if (FATFS_LinkDriver(&SD_Driver, SDPath) == 0) {
+
+		/*##-2- Init the SD Card #################################################*/
+
+		SD_Initialize();
+
+		/* Create FAT volume */
+
+		if (BSP_SD_IsDetected(0)) {
+			FRESULT res;
+			res = f_mkfs(SDPath, FM_ANY, 0, workBuffer, sizeof(workBuffer));
+			if (res != FR_OK) {
+				Error_Handler();
+			}
+			Appli_state = APPLICATION_RUNNING;
+		}
+
+		/* Infinite loop */
+		while (1) {
+			/* Mass Storage Application State Machine */
+			switch (Appli_state) {
+			case APPLICATION_RUNNING:
+				BSP_LED_Off(LED_RED);
+				SD_Initialize();
+				FS_FileOperations();
+				Appli_state = APPLICATION_IDLE;
+				return;
+
+			case APPLICATION_IDLE:
+				break;
+
+			case APPLICATION_SD_UNPLUGGED:
+				if (isInitialized == 1) {
+					isInitialized = 0;
+					Error_Handler();
+				}
+				Appli_state = APPLICATION_IDLE;
+				break;
+
+			case APPLICATION_STATUS_CHANGED:
+				if (BSP_SD_IsDetected(0)) {
+					Appli_state = APPLICATION_RUNNING;
+				} else {
+					Appli_state = APPLICATION_SD_UNPLUGGED;
+					f_mount(NULL, (TCHAR const*) "", 0);
+				}
+				break;
+			default:
+				break;
+			}
+		}
+	}
+}
+#endif
 
 /**
   * @brief  System Clock Configuration
@@ -285,6 +485,7 @@ static void MPU_Config(void)
   /* Disable the MPU */
   HAL_MPU_Disable();
 
+
   /* Configure the MPU attributes as Device not cacheable
      for ETH DMA descriptors */
   MPU_InitStruct.Enable = MPU_REGION_ENABLE;
@@ -300,6 +501,7 @@ static void MPU_Config(void)
   MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
 
   HAL_MPU_ConfigRegion(&MPU_InitStruct);
+
 
   /* Configure the MPU attributes as Normal Non Cacheable
      for LwIP RAM heap which contains the Tx buffers */
@@ -317,6 +519,8 @@ static void MPU_Config(void)
 
   HAL_MPU_ConfigRegion(&MPU_InitStruct);
 
+#if 0
+
 #ifdef USE_LCD
   /* Configure the MPU attributes as WT for SDRAM */
   MPU_InitStruct.Enable = MPU_REGION_ENABLE;
@@ -333,9 +537,26 @@ static void MPU_Config(void)
 
   HAL_MPU_ConfigRegion(&MPU_InitStruct);
 #endif
+#endif
+
+//  MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+//  MPU_InitStruct.BaseAddress = 0x24000000;
+//  MPU_InitStruct.Size = MPU_REGION_SIZE_512KB;
+//  MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
+//  MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+//  MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+//  MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
+//  MPU_InitStruct.Number = MPU_REGION_NUMBER1;
+//  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL1;
+//  MPU_InitStruct.SubRegionDisable = 0x00;
+//  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
+//
+//  HAL_MPU_ConfigRegion(&MPU_InitStruct);
+
 
   /* Enable the MPU */
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+
 }
 
 /**

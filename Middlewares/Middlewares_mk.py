@@ -47,6 +47,12 @@ def getSrcs(workspace):
         'Middlewares/Third_Party/FreeRTOS/Source/queue.c',
         'Middlewares/Third_Party/FreeRTOS/Source/tasks.c',
         'Middlewares/Third_Party/FreeRTOS/Source/timers.c',
+        # FatFs
+        'Middlewares/Third_Party/FatFs/src/diskio.c',
+        'Middlewares/Third_Party/FatFs/src/ff.c',
+        'Middlewares/Third_Party/FatFs/src/ff_gen_drv.c',
+        'Middlewares/Third_Party/FatFs/src/option/unicode.c',
+        'Middlewares/Third_Party/FatFs/src/option/syscall.c'
     ]
 
 
@@ -60,5 +66,8 @@ def getIncs(workspace):
         'Middlewares/Third_Party/FreeRTOS/Source',
         'Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS',
         'Middlewares/Third_Party/FreeRTOS/Source/include',
-        'Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1'
+        'Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1',
+        # FatFs
+        'Middlewares/Third_Party/FatFs/src',
+        'Middlewares/Third_Party/FatFs/src/option'
     ]

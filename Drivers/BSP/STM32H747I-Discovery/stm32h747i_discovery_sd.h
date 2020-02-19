@@ -7,7 +7,7 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
+  * <h2><center>&copy; Copyright (c) 2018 STMicroelectronics.
   * All rights reserved.</center></h2>
   *
   * This software component is licensed by ST under BSD 3-Clause license,
@@ -16,117 +16,156 @@
   *                        opensource.org/licenses/BSD-3-Clause
   *
   ******************************************************************************
-  */ 
+  */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __STM32H747I_DISCOVERY_SD_H
-#define __STM32H747I_DISCOVERY_SD_H
+#ifndef STM32H747I_DISCO_SD_H
+#define STM32H747I_DISCO_SD_H
 
 #ifdef __cplusplus
  extern "C" {
-#endif 
+#endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32h7xx_hal.h"
-#include "stm32h747i_discovery.h"
+#include "stm32h747i_discovery_conf.h"
+#include "stm32h747i_discovery_errno.h"
 
 /** @addtogroup BSP
   * @{
-  */ 
-
-/** @addtogroup STM32H747I_DISCOVERY
-  * @{
   */
-    
-/** @addtogroup STM32H747I_DISCOVERY_SD
-  * @{
-  */    
 
-/** @defgroup STM32H747I_DISCOVERY_SD_Exported_Types Exported Types
+/** @addtogroup STM32H747I_DISCO
   * @{
   */
 
-/** 
-  * @brief SD Card information structure 
+/** @addtogroup STM32H747I_DISCO_SD
+  * @{
+  */
+
+/** @defgroup STM32H747I_DISCO_SD_Exported_Types Exported Types
+  * @{
+  */
+
+/**
+  * @brief SD Card information structure
   */
 #define BSP_SD_CardInfo HAL_SD_CardInfoTypeDef
+
+#if (USE_HAL_SD_REGISTER_CALLBACKS == 1)
+typedef struct
+{
+  void (* pMspInitCb)(SD_HandleTypeDef *);
+  void (* pMspDeInitCb)(SD_HandleTypeDef *);
+}BSP_SD_Cb_t;
+#endif /* (USE_HAL_SD_REGISTER_CALLBACKS == 1) */
 /**
   * @}
   */
 
-/** @defgroup STM32H747I_DISCOVERY_SD_ Exported_Constants Exported Constants
+/** @defgroup STM32H747I_DISCO_SD_Exported_Constants Exported Constants
   * @{
-  */   
-/** 
-  * @brief  SD status structure definition  
-  */     
-#define   MSD_OK                        ((uint8_t)0x00)
-#define   MSD_ERROR                     ((uint8_t)0x01)
-#define   MSD_ERROR_SD_NOT_PRESENT      ((uint8_t)0x02)
+  */
+#define SD_INSTANCES_NBR         1UL
 
-/** 
-  * @brief  SD transfer state definition  
-  */     
-#define   SD_TRANSFER_OK                ((uint8_t)0x00)
-#define   SD_TRANSFER_BUSY              ((uint8_t)0x01)
+#ifndef SD_WRITE_TIMEOUT
+#define SD_WRITE_TIMEOUT         100U
+#endif
 
- 
-#define SD_PRESENT               ((uint8_t)0x01)
-#define SD_NOT_PRESENT           ((uint8_t)0x00)
+#ifndef SD_READ_TIMEOUT
+#define SD_READ_TIMEOUT          100U
+#endif
 
-#define SD_DATATIMEOUT           ((uint32_t)100000000)
-    
+/**
+  * @brief  SD transfer state definition
+  */
+#define   SD_TRANSFER_OK         0U
+#define   SD_TRANSFER_BUSY       1U
+
+/**
+  * @brief SD-detect signal
+  */
+#define SD_PRESENT               1UL
+#define SD_NOT_PRESENT           0UL
+
+/**
+  * @brief SD-detect signal
+  */
+#define SD_DETECT_PIN                        GPIO_PIN_8
+#define SD_DETECT_GPIO_PORT                  GPIOI
+#define SD_DETECT_GPIO_CLK_ENABLE()          __HAL_RCC_GPIOI_CLK_ENABLE()
+#define SD_DETECT_GPIO_CLK_DISABLE()         __HAL_RCC_GPIOI_CLK_DISABLE()
+#define SD_DETECT_EXTI_IRQn                  EXTI9_5_IRQn
+
+#define SD_DETECT_EXTI_LINE              EXTI_LINE_8
+#define SD_DetectIRQHandler()            HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_8)
+
 /**
   * @}
   */
-  
-   
-/** @addtogroup STM32H747I_DISCOVERY_SD_Exported_Functions
+
+/** @addtogroup STM32H747I_DISCO_SD_Exported_Variables
   * @{
-  */   
-uint8_t BSP_SD_Init(void);
-uint8_t BSP_SD_DeInit(void);
-uint8_t BSP_SD_ITConfig(void);
+  */
+extern SD_HandleTypeDef    hsd_sdmmc[];
+extern EXTI_HandleTypeDef  hsd_exti[];
 
-uint8_t BSP_SD_ReadBlocks(uint32_t *pData, uint32_t ReadAddr, uint32_t NumOfBlocks, uint32_t Timeout);
-uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint32_t WriteAddr, uint32_t NumOfBlocks, uint32_t Timeout);
-uint8_t BSP_SD_ReadBlocks_DMA(uint32_t *pData, uint32_t ReadAddr, uint32_t NumOfBlocks);
-uint8_t BSP_SD_WriteBlocks_DMA(uint32_t *pData, uint32_t WriteAddr, uint32_t NumOfBlocks);
-uint8_t BSP_SD_Erase(uint32_t StartAddr, uint32_t EndAddr);
-uint8_t BSP_SD_GetCardState(void);
-void    BSP_SD_GetCardInfo(BSP_SD_CardInfo *CardInfo);
-uint8_t BSP_SD_IsDetected(void);
-void    BSP_SD_IRQHandler(void);
+/**
+  * @}
+  */
 
-/* These functions can be modified in case the current settings (e.g. DMA stream)
+/** @addtogroup STM32H747I_DISCO_SD_Exported_Functions
+  * @{
+  */
+int32_t BSP_SD_Init(uint32_t Instance);
+int32_t BSP_SD_DeInit(uint32_t Instance);
+#if (USE_HAL_SD_REGISTER_CALLBACKS == 1)
+int32_t BSP_SD_RegisterMspCallbacks(uint32_t Instance, BSP_SD_Cb_t *CallBacks);
+int32_t BSP_SD_RegisterDefaultMspCallbacks(uint32_t Instance);
+#endif /* (USE_HAL_SD_REGISTER_CALLBACKS == 1) */
+int32_t BSP_SD_DetectITConfig(uint32_t Instance);
+int32_t BSP_SD_ReadBlocks(uint32_t Instance, uint32_t *pData, uint32_t BlockIdx, uint32_t BlocksNbr);
+int32_t BSP_SD_WriteBlocks(uint32_t Instance, uint32_t *pData, uint32_t BlockIdx, uint32_t NbrOfBlocks);
+int32_t BSP_SD_ReadBlocks_DMA(uint32_t Instance, uint32_t *pData, uint32_t BlockIdx, uint32_t NbrOfBlocks);
+int32_t BSP_SD_WriteBlocks_DMA(uint32_t Instance, uint32_t *pData, uint32_t BlockIdx, uint32_t NbrOfBlocks);
+int32_t BSP_SD_ReadBlocks_IT(uint32_t Instance, uint32_t *pData, uint32_t BlockIdx, uint32_t NbrOfBlocks);
+int32_t BSP_SD_WriteBlocks_IT(uint32_t Instance, uint32_t *pData, uint32_t BlockIdx, uint32_t NbrOfBlocks);
+int32_t BSP_SD_Erase(uint32_t Instance, uint32_t BlockIdx, uint32_t BlocksNbr);
+int32_t BSP_SD_GetCardState(uint32_t Instance);
+int32_t BSP_SD_GetCardInfo(uint32_t Instance, BSP_SD_CardInfo *CardInfo);
+int32_t BSP_SD_IsDetected(uint32_t Instance);
+
+void    BSP_SD_DETECT_IRQHandler(uint32_t Instance);
+void    BSP_SD_IRQHandler(uint32_t Instance);
+
+/* These functions can be modified in case the current settings (e.g. DMA stream ot IT)
    need to be changed for specific application needs */
-void    BSP_SD_MspInit(SD_HandleTypeDef *hsd, void *Params);
-void    BSP_SD_MspDeInit(SD_HandleTypeDef *hsd, void *Params);
-void    BSP_SD_AbortCallback(void);
-void    BSP_SD_WriteCpltCallback(void);
-void    BSP_SD_ReadCpltCallback(void);
-
-
-/**
-  * @}
-  */ 
+void BSP_SD_AbortCallback(uint32_t Instance);
+void BSP_SD_WriteCpltCallback(uint32_t Instance);
+void BSP_SD_ReadCpltCallback(uint32_t Instance);
+void BSP_SD_DetectCallback(uint32_t Instance, uint32_t Status);
+void HAL_SD_DriveTransciver_1_8V_Callback(FlagStatus status);
+HAL_StatusTypeDef MX_SDMMC1_SD_Init(SD_HandleTypeDef *hsd);
 
 /**
   * @}
-  */ 
+  */
 
 /**
   * @}
-  */ 
+  */
 
 /**
   * @}
-  */ 
+  */
+
+/**
+  * @}
+  */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __STM32H747I_DISCOVERY_SD_H */
+#endif /* STM32H747I_DISCO_SD_H */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

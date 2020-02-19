@@ -2,12 +2,15 @@
   ******************************************************************************
   * @file    stm32h747i_discovery.h
   * @author  MCD Application Team
-  * @brief   This file contains definitions for STM32H747I-Discovery LEDs,
-  *          push-buttons hardware resources.
+  * @brief   This file contains definitions for STM32H747I_DISCO:
+  *          LEDs
+  *          push-buttons
+  *          COM ports
+  *          hardware resources.
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
+  * <h2><center>&copy; Copyright (c) 2018 STMicroelectronics.
   * All rights reserved.</center></h2>
   *
   * This software component is licensed by ST under BSD 3-Clause license,
@@ -19,118 +22,171 @@
   */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __STM32H747I_DISCOVERY_H
-#define __STM32H747I_DISCOVERY_H
+#ifndef STM32H747I_DISCO_H
+#define STM32H747I_DISCO_H
 
 #ifdef __cplusplus
  extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32h7xx_hal.h"
-#if defined(BSP_USE_CMSIS_OS)
-#include "cmsis_os.h"
-#endif
+#include "stm32h747i_discovery_conf.h"
+#include "stm32h747i_discovery_errno.h"
 
+ #if (USE_BSP_COM_FEATURE > 0)
+  #if (USE_COM_LOG > 0)
+    #ifndef __GNUC__
+      #include "stdio.h"
+    #endif
+  #endif
+#endif
 /** @addtogroup BSP
   * @{
   */
 
-/** @addtogroup STM32H747I_DISCOVERY
+/** @addtogroup STM32H747I_DISCO
   * @{
   */
 
-/** @addtogroup STM32H747I_DISCOVERY_LOW_LEVEL
+/** @addtogroup STM32H747I_DISCO_LOW_LEVEL
   * @{
   */
 
-/** @defgroup STM32H747I_DISCOVERY_LOW_LEVEL_Exported_Types Exported Types
+/** @defgroup STM32H747I_DISCO_LOW_LEVEL_Exported_Types Exported Types
  * @{
  */
 
-/** @brief Led_TypeDef
-  *  STM32H747I_DISCOVERY board leds definitions.
-  */
 typedef enum
 {
-  LED1 = 0,
+  LED1 = 0U,
   LED_GREEN = LED1,
-  LED2 = 1,
+  LED2 = 1U,
   LED_ORANGE = LED2,
-  LED3 = 2,
+  LED3 = 2U,
   LED_RED = LED3,
-  LED4 = 3,
-  LED_BLUE = LED4
+  LED4 = 3U,
+  LED_BLUE = LED4,
+  LEDn
 } Led_TypeDef;
 
-/** @brief Button_TypeDef
-  *  STM32H747I_DISCOVERY board Buttons definitions.
-  */
 typedef enum
 {
-  BUTTON_WAKEUP = 0,
+  BUTTON_WAKEUP = 0U,
+  BUTTONn
 } Button_TypeDef;
 
-#define BUTTON_USER BUTTON_WAKEUP
-
-/** @brief ButtonMode_TypeDef
-  *  STM32H747I_DISCOVERY board Buttons Modes definitions.
-  */
 typedef enum
 {
-  BUTTON_MODE_GPIO = 0,
-  BUTTON_MODE_EXTI = 1
-} ButtonMode_TypeDef;
+  BUTTON_MODE_GPIO = 0U,
+  BUTTON_MODE_EXTI = 1U
+}ButtonMode_TypeDef;
 
-
+#if (USE_BSP_COM_FEATURE > 0)
 typedef enum
 {
-  PB_SET = 0,
-  PB_RESET = !PB_SET
-} ButtonValue_TypeDef;
+  COM1 = 0U,
+  COMn
+}COM_TypeDef;
 
 typedef enum
 {
-  JOY_MODE_GPIO = 0,
-  JOY_MODE_EXTI = 1
-} JOYMode_TypeDef;
+  COM_STOPBITS_1     =   UART_STOPBITS_1,
+  COM_STOPBITS_2     =   UART_STOPBITS_2,
+}COM_StopBitsTypeDef;
 
 typedef enum
 {
-  JOY_SEL   = 0,
-  JOY_DOWN  = 1,
-  JOY_LEFT  = 2,
-  JOY_RIGHT = 3,
-  JOY_UP    = 4,
-  JOY_NONE  = 5
-} JOYState_TypeDef;
+  COM_PARITY_NONE     =  UART_PARITY_NONE,
+  COM_PARITY_EVEN     =  UART_PARITY_EVEN,
+  COM_PARITY_ODD      =  UART_PARITY_ODD,
+}COM_ParityTypeDef;
 
-/** @brief DISCO_Status_TypeDef
-  *  STM32H747I_DISCO board Status return possible values.
-  */
 typedef enum
 {
-  DISCO_OK    = 0,
-  DISCO_ERROR = 1
-} DISCO_Status_TypeDef;
+  COM_HWCONTROL_NONE    =  UART_HWCONTROL_NONE,
+  COM_HWCONTROL_RTS     =  UART_HWCONTROL_RTS,
+  COM_HWCONTROL_CTS     =  UART_HWCONTROL_CTS,
+  COM_HWCONTROL_RTS_CTS =  UART_HWCONTROL_RTS_CTS,
+}COM_HwFlowCtlTypeDef;
 
+typedef enum
+{
+  COM_WORDLENGTH_7B = UART_WORDLENGTH_7B,
+  COM_WORDLENGTH_8B = UART_WORDLENGTH_8B,
+  COM_WORDLENGTH_9B = UART_WORDLENGTH_9B,
+}COM_WordLengthTypeDef;
+
+typedef struct
+{
+  uint32_t              BaudRate;
+  COM_WordLengthTypeDef WordLength;
+  COM_StopBitsTypeDef   StopBits;
+  COM_ParityTypeDef     Parity;
+  COM_HwFlowCtlTypeDef  HwFlowCtl;
+}COM_InitTypeDef;
+
+#if (USE_HAL_UART_REGISTER_CALLBACKS == 1)
+typedef struct
+{
+  void (* pMspInitCb)(UART_HandleTypeDef *);
+  void (* pMspDeInitCb)(UART_HandleTypeDef *);
+}BSP_COM_Cb_t;
+#endif /* (USE_HAL_UART_REGISTER_CALLBACKS == 1) */
+#endif
+
+typedef enum
+{
+  JOY_MODE_GPIO = 0U,
+  JOY_MODE_EXTI = 1U
+}JOYMode_TypeDef;
+
+typedef enum
+{
+  JOY1 = 0U,
+  JOYn
+}JOY_TypeDef;
+
+typedef enum
+{
+ JOY_NONE  = 0x00U,
+ JOY_SEL   = 0x01U,
+ JOY_DOWN  = 0x02U,
+ JOY_LEFT  = 0x04U,
+ JOY_RIGHT = 0x08U,
+ JOY_UP    = 0x10U,
+ JOY_ALL   = 0x1FU
+}JOYPin_TypeDef;
 /**
   * @}
   */
 
-/** @defgroup STM32H747I_DISCOVERY_LOW_LEVEL_Exported_Constants Exported Constants
+/** @defgroup STM32H747I_DISCO_LOW_LEVEL_Exported_Constants Exported Constants
   * @{
   */
 
 /**
-  * @brief  Define for STM32H747I_DISCOVERY board
+  * @brief  Define for STM32H747I_DISCO board
   */
 #if !defined (USE_STM32H747I_DISCO)
  #define USE_STM32H747I_DISCO
 #endif
+/**
+ * @brief STM32H747I Discovery BSP Driver version number V2.0.0
+ */
+#define STM32H747I_DISCO_BSP_VERSION_MAIN   (0x02) /*!< [31:24] main version */
+#define STM32H747I_DISCO_BSP_VERSION_SUB1   (0x00) /*!< [23:16] sub1 version */
+#define STM32H747I_DISCO_BSP_VERSION_SUB2   (0x00) /*!< [15:8]  sub2 version */
+#define STM32H747I_DISCO_BSP_VERSION_RC     (0x00) /*!< [7:0]  release candidate */
+#define STM32H747I_DISCO_BSP_VERSION        ((STM32H747I_DISCO_BSP_VERSION_MAIN << 24)\
+                                            |(STM32H747I_DISCO_BSP_VERSION_SUB1 << 16)\
+                                            |(STM32H747I_DISCO_BSP_VERSION_SUB2 << 8 )\
+                                            |(STM32H747I_DISCO_BSP_VERSION_RC))
+#define STM32H747I_DISCO_BSP_BOARD_NAME  "STM32H747I-DISCO";
+#define STM32H747I_DISCO_BSP_BOARD_ID    "MB12481D";
 
-#define LEDn                             ((uint32_t)4)
-
+/** @defgroup STM32H747I_DISCO_LOW_LEVEL_LED EVAL LOW LEVEL LED
+  * @{
+  */
 #define LED1_GPIO_PORT                   GPIOI
 #define LED1_PIN                         GPIO_PIN_12
 
@@ -145,196 +201,158 @@ typedef enum
 
 #define LEDx_GPIO_CLK_ENABLE()           __HAL_RCC_GPIOI_CLK_ENABLE()
 #define LEDx_GPIO_CLK_DISABLE()          __HAL_RCC_GPIOI_CLK_DISABLE()
+/**
+  * @}
+  */
 
-/* Only one User/Wakeup button */
-#define BUTTONn                             ((uint8_t)1)
-
+/** @defgroup STM32H747I_DISCO_LOW_LEVEL_BUTTON LOW LEVEL BUTTON
+  * @{
+  */
+/* Button state */
+#define BUTTON_RELEASED                    0U
+#define BUTTON_PRESSED                     1U
 /**
   * @brief Wakeup push-button
   */
-#define WAKEUP_BUTTON_PIN                   GPIO_PIN_13
-#define WAKEUP_BUTTON_GPIO_PORT             GPIOC
-#define WAKEUP_BUTTON_GPIO_CLK_ENABLE()     __HAL_RCC_GPIOC_CLK_ENABLE()
-#define WAKEUP_BUTTON_GPIO_CLK_DISABLE()    __HAL_RCC_GPIOC_CLK_DISABLE()
-#define WAKEUP_BUTTON_EXTI_IRQn             EXTI15_10_IRQn
-
-/* Define the USER button as an alias of the Wakeup button */
-#define USER_BUTTON_PIN                   WAKEUP_BUTTON_PIN
-#define USER_BUTTON_GPIO_PORT             WAKEUP_BUTTON_GPIO_PORT
-#define USER_BUTTON_GPIO_CLK_ENABLE()     WAKEUP_BUTTON_GPIO_CLK_ENABLE()
-#define USER_BUTTON_GPIO_CLK_DISABLE()    WAKEUP_BUTTON_GPIO_CLK_DISABLE()
-#define USER_BUTTON_EXTI_IRQn             WAKEUP_BUTTON_EXTI_IRQn
-
-#define BUTTON_GPIO_CLK_ENABLE()            __HAL_RCC_GPIOC_CLK_ENABLE()
-
-#define JOYn                              ((uint8_t)5)
-
-/**
- * @brief Joystick Selection push-button
- */
-#define SEL_JOY_PIN                       GPIO_PIN_2
-#define SEL_JOY_GPIO_PORT                 GPIOK
-#define SEL_JOY_GPIO_CLK_ENABLE()         __HAL_RCC_GPIOK_CLK_ENABLE()
-#define SEL_JOY_GPIO_CLK_DISABLE()        __HAL_RCC_GPIOK_CLK_DISABLE()
-#define SEL_JOY_EXTI_IRQn                 EXTI2_IRQn
-
-/**
-* @brief Joystick Down push-button
-*/
-#define DOWN_JOY_PIN                      GPIO_PIN_3
-#define DOWN_JOY_GPIO_PORT                GPIOK
-#define DOWN_JOY_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOK_CLK_ENABLE()
-#define DOWN_JOY_GPIO_CLK_DISABLE()       __HAL_RCC_GPIOK_CLK_DISABLE()
-#define DOWN_JOY_EXTI_IRQn                EXTI3_IRQn
-
-/**
-* @brief Joystick Left push-button
-*/
-#define LEFT_JOY_PIN                      GPIO_PIN_4
-#define LEFT_JOY_GPIO_PORT                GPIOK
-#define LEFT_JOY_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOK_CLK_ENABLE()
-#define LEFT_JOY_GPIO_CLK_DISABLE()       __HAL_RCC_GPIOK_CLK_DISABLE()
-#define LEFT_JOY_EXTI_IRQn                EXTI4_IRQn
-
-/**
- * @brief Joystick Right push-button
- */
-#define RIGHT_JOY_PIN                     GPIO_PIN_5
-#define RIGHT_JOY_GPIO_PORT               GPIOK
-#define RIGHT_JOY_GPIO_CLK_ENABLE()       __HAL_RCC_GPIOK_CLK_ENABLE()
-#define RIGHT_JOY_GPIO_CLK_DISABLE()      __HAL_RCC_GPIOK_CLK_DISABLE()
-#define RIGHT_JOY_EXTI_IRQn               EXTI9_5_IRQn
-
-/**
-* @brief Joystick Up push-button
-*/
-#define UP_JOY_PIN                        GPIO_PIN_6
-#define UP_JOY_GPIO_PORT                  GPIOK
-#define UP_JOY_GPIO_CLK_ENABLE()          __HAL_RCC_GPIOK_CLK_ENABLE()
-#define UP_JOY_GPIO_CLK_DISABLE()         __HAL_RCC_GPIOK_CLK_DISABLE()
-#define UP_JOY_EXTI_IRQn                  EXTI9_5_IRQn
-
-#define JOYx_GPIO_CLK_ENABLE(__JOY__)     do { if((__JOY__) == JOY_SEL)   { SEL_JOY_GPIO_CLK_ENABLE();   } else \
-                                               if((__JOY__) == JOY_DOWN)  { DOWN_JOY_GPIO_CLK_ENABLE();  } else \
-                                               if((__JOY__) == JOY_LEFT)  { LEFT_JOY_GPIO_CLK_ENABLE();  } else \
-                                               if((__JOY__) == JOY_RIGHT) { RIGHT_JOY_GPIO_CLK_ENABLE(); } else \
-                                               if((__JOY__) == JOY_UP)    { UP_JOY_GPIO_CLK_ENABLE(); }  } while(0)
-
-#define JOYx_GPIO_CLK_DISABLE(__JOY__)    do { if((__JOY__) == JOY_SEL)   { SEL_JOY_GPIO_CLK_DISABLE();   } else \
-                                               if((__JOY__) == JOY_DOWN)  { DOWN_JOY_GPIO_CLK_DISABLE();  } else \
-                                               if((__JOY__) == JOY_LEFT)  { LEFT_JOY_GPIO_CLK_DISABLE();  } else \
-                                               if((__JOY__) == JOY_RIGHT) { RIGHT_JOY_GPIO_CLK_DISABLE(); } else \
-                                               if((__JOY__) == JOY_UP)    { UP_JOY_GPIO_CLK_DISABLE(); }  } while(0)
-
-#define JOY_ALL_PINS                      (RIGHT_JOY_PIN | LEFT_JOY_PIN | UP_JOY_PIN | DOWN_JOY_PIN | SEL_JOY_PIN)
-
-
-/**
-  * @brief USB OTG HS Over Current signal
-  */
-#define OTG_HS_OVER_CURRENT_PIN                  GPIO_PIN_1
-#define OTG_HS_OVER_CURRENT_PORT                 GPIOJ
-#define OTG_HS_OVER_CURRENT_PORT_CLK_ENABLE()    __HAL_RCC_GPIOJ_CLK_ENABLE()
-
-/**
-  * @brief SD-detect signal
-  */
-#define SD_DETECT_PIN                        ((uint32_t)GPIO_PIN_8)
-#define SD_DETECT_GPIO_PORT                  ((GPIO_TypeDef*)GPIOI)
-#define SD_DETECT_GPIO_CLK_ENABLE()          __HAL_RCC_GPIOI_CLK_ENABLE()
-#define SD_DETECT_GPIO_CLK_DISABLE()         __HAL_RCC_GPIOI_CLK_DISABLE()
-#define SD_DETECT_EXTI_IRQn                  EXTI9_5_IRQn
-
-/**
-  * @brief TS_INT signal from TouchScreen when it is configured in interrupt mode
-  * GPIOI13 is used for that purpose on Manta Dragon Discovery board
-  */
-#define TS_INT_PIN                        ((uint32_t)GPIO_PIN_7)
-#define TS_INT_GPIO_PORT                  ((GPIO_TypeDef*)GPIOK)
-#define TS_INT_GPIO_CLK_ENABLE()          __HAL_RCC_GPIOK_CLK_ENABLE()
-#define TS_INT_GPIO_CLK_DISABLE()         __HAL_RCC_GPIOK_CLK_DISABLE()
-#define TS_INT_EXTI_IRQn                  EXTI9_5_IRQn
-
-/**
-  * @brief TouchScreen FT6206 Slave I2C address 1
-  */
-#define TS_I2C_ADDRESS                   ((uint16_t)0x54)
-
-/**
-  * @brief TouchScreen FT6336G Slave I2C address 2
-  */
-#define TS_I2C_ADDRESS_A02               ((uint16_t)0x70)
-
-/**
-  * @brief LCD DSI Slave I2C address 1
-  */
-#define LCD_DSI_ADDRESS                  TS_I2C_ADDRESS
-
-/**
-  * @brief LCD DSI Slave I2C address 2
-  */
-#define LCD_DSI_ADDRESS_A02              TS_I2C_ADDRESS_A02
-
-/**
-  * @brief Audio I2C Slave address
-  */
-#define AUDIO_I2C_ADDRESS                ((uint16_t)0x34)
-
-#define CAMERA_I2C_ADDRESS               ((uint16_t)0x60)
-
-/**
-  * @brief User can use this section to tailor I2C4/I2C4 instance used and associated
-  * resources (audio codec).
-  * Definition for I2C4 clock resources
-  */
-#define DISCOVERY_I2Cx                             I2C4
-#define DISCOVERY_I2Cx_CLK_ENABLE()                __HAL_RCC_I2C4_CLK_ENABLE()
-#define DISCOVERY_I2Cx_SCL_SDA_GPIO_CLK_ENABLE()   __HAL_RCC_GPIOD_CLK_ENABLE()
-
-#define DISCOVERY_I2Cx_FORCE_RESET()               __HAL_RCC_I2C4_FORCE_RESET()
-#define DISCOVERY_I2Cx_RELEASE_RESET()             __HAL_RCC_I2C4_RELEASE_RESET()
-
-/** @brief Definition for I2C4 Pins
-  */
-#define DISCOVERY_I2Cx_SCL_PIN                     GPIO_PIN_12 /*!< PD12 */
-#define DISCOVERY_I2Cx_SDA_PIN                     GPIO_PIN_13 /*!< PD13 */
-#define DISCOVERY_I2Cx_SCL_SDA_AF                  GPIO_AF4_I2C4
-#define DISCOVERY_I2Cx_SCL_SDA_GPIO_PORT           GPIOD
-/** @brief Definition of I2C4 interrupt requests
-  */
-#define DISCOVERY_I2Cx_EV_IRQn                     I2C4_EV_IRQn
-#define DISCOVERY_I2Cx_ER_IRQn                     I2C4_ER_IRQn
-
-/* I2C TIMING Register define when I2C clock source is SYSCLK */
-/* I2C TIMING is calculated from APB1 source clock = 50 MHz */
-/* Due to the big MOFSET capacity for adapting the camera level the rising time is very large (>1us) */
-/* 0x40912732 takes in account the big rising and aims a clock of 100khz */
-#ifndef DISCOVERY_I2Cx_TIMING
-#define DISCOVERY_I2Cx_TIMING                      ((uint32_t)0x40912732)
-#endif /* DISCOVERY_I2Cx_TIMING */
+#define BUTTON_WAKEUP_PIN                   GPIO_PIN_13
+#define BUTTON_WAKEUP_GPIO_PORT             GPIOC
+#define BUTTON_WAKEUP_GPIO_CLK_ENABLE()     __HAL_RCC_GPIOC_CLK_ENABLE()
+#define BUTTON_WAKEUP_GPIO_CLK_DISABLE()    __HAL_RCC_GPIOC_CLK_DISABLE()
+#define BUTTON_WAKEUP_EXTI_IRQn             EXTI15_10_IRQn
+#define BUTTON_WAKEUP_EXTI_LINE             EXTI_LINE_13
 
 /**
   * @}
   */
 
-
-/** @addtogroup STM32H747I_DISCOVERY_LOW_LEVEL_Exported_Functions
+/** @defgroup STM32H747I_DISCO_LOW_LEVEL_COM LOW LEVEL COM
   * @{
   */
-uint32_t         BSP_GetVersion(void);
-void             BSP_LED_Init(Led_TypeDef Led);
-void             BSP_LED_DeInit(Led_TypeDef Led);
-void             BSP_LED_On(Led_TypeDef Led);
-void             BSP_LED_Off(Led_TypeDef Led);
-void             BSP_LED_Toggle(Led_TypeDef Led);
-void             BSP_PB_Init(Button_TypeDef Button, ButtonMode_TypeDef Button_Mode);
-void             BSP_PB_DeInit(Button_TypeDef Button);
-uint32_t         BSP_PB_GetState(Button_TypeDef Button);
-uint8_t          BSP_JOY_Init(JOYMode_TypeDef Joy_Mode);
-void             BSP_JOY_DeInit(void);
-JOYState_TypeDef BSP_JOY_GetState(void);
-void             BSP_ErrorNotify(void);
+#if (USE_BSP_COM_FEATURE > 0)
+/**
+ * @brief Definition for COM port1, connected to USART1
+ */
+#define COM1_UART                      USART1
+#define COM1_CLK_ENABLE()             __HAL_RCC_USART1_CLK_ENABLE()
+#define COM1_CLK_DISABLE()            __HAL_RCC_USART1_CLK_DISABLE()
 
+#define COM1_TX_PIN                   GPIO_PIN_9
+#define COM1_TX_GPIO_PORT             GPIOA
+#define COM1_TX_GPIO_CLK_ENABLE()     __HAL_RCC_GPIOA_CLK_ENABLE()
+#define COM1_TX_GPIO_CLK_DISABLE()    __HAL_RCC_GPIOA_CLK_DISABLE()
+#define COM1_TX_AF                    GPIO_AF7_USART1
+
+#define COM1_RX_PIN                    GPIO_PIN_10
+#define COM1_RX_GPIO_PORT              GPIOA
+#define COM1_RX_GPIO_CLK_ENABLE()      __HAL_RCC_GPIOA_CLK_ENABLE()
+#define COM1_RX_GPIO_CLK_DISABLE()     __HAL_RCC_GPIOA_CLK_DISABLE()
+#define COM1_RX_AF                    GPIO_AF7_USART1
+#define COM_POLL_TIMEOUT              1000
+
+#define MX_UART_InitTypeDef COM_InitTypeDef
+#endif
+/**
+  * @}
+  */
+
+/** @defgroup STM32H747I_DISCO_LOW_LEVEL_JOY LOW LEVEL JOY
+  * @{
+  */
+#define JOY_KEY_NUMBER                     5U
+
+#define JOY1_SEL_PIN                       GPIO_PIN_2
+#define JOY1_SEL_GPIO_PORT                 GPIOK
+#define JOY1_SEL_GPIO_CLK_ENABLE()         __HAL_RCC_GPIOK_CLK_ENABLE()
+#define JOY1_SEL_GPIO_CLK_DISABLE()        __HAL_RCC_GPIOK_CLK_DISABLE()
+#define JOY1_SEL_EXTI_IRQn                 EXTI2_IRQn
+#define JOY1_SEL_EXTI_LINE                 EXTI_LINE_2
+
+#define JOY1_DOWN_PIN                      GPIO_PIN_3
+#define JOY1_DOWN_GPIO_PORT                GPIOK
+#define JOY1_DOWN_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOK_CLK_ENABLE()
+#define JOY1_DOWN_GPIO_CLK_DISABLE()       __HAL_RCC_GPIOK_CLK_DISABLE()
+#define JOY1_DOWN_EXTI_IRQn                EXTI3_IRQn
+#define JOY1_DOWN_EXTI_LINE                EXTI_LINE_3
+
+#define JOY1_LEFT_PIN                      GPIO_PIN_4
+#define JOY1_LEFT_GPIO_PORT                GPIOK
+#define JOY1_LEFT_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOK_CLK_ENABLE()
+#define JOY1_LEFT_GPIO_CLK_DISABLE()       __HAL_RCC_GPIOK_CLK_DISABLE()
+#define JOY1_LEFT_EXTI_IRQn                EXTI4_IRQn
+#define JOY1_LEFT_EXTI_LINE                EXTI_LINE_4
+
+#define JOY1_RIGHT_PIN                     GPIO_PIN_5
+#define JOY1_RIGHT_GPIO_PORT               GPIOK
+#define JOY1_RIGHT_GPIO_CLK_ENABLE()       __HAL_RCC_GPIOK_CLK_ENABLE()
+#define JOY1_RIGHT_GPIO_CLK_DISABLE()      __HAL_RCC_GPIOK_CLK_DISABLE()
+#define JOY1_RIGHT_EXTI_IRQn               EXTI9_5_IRQn
+#define JOY1_RIGHT_EXTI_LINE               EXTI_LINE_5
+
+#define JOY1_UP_PIN                        GPIO_PIN_6
+#define JOY1_UP_GPIO_PORT                  GPIOK
+#define JOY1_UP_GPIO_CLK_ENABLE()          __HAL_RCC_GPIOK_CLK_ENABLE()
+#define JOY1_UP_GPIO_CLK_DISABLE()         __HAL_RCC_GPIOK_CLK_DISABLE()
+#define JOY1_UP_EXTI_IRQn                  EXTI9_5_IRQn
+#define JOY1_UP_EXTI_LINE                  EXTI_LINE_6
+/**
+  * @}
+  */
+
+/**
+  * @}
+  */
+
+/** @addtogroup STM32H747I_DISCO_LOW_LEVEL_Exported_Variables
+  * @{
+  */
+extern EXTI_HandleTypeDef hpb_exti[];
+extern UART_HandleTypeDef hcom_uart[];
+extern USART_TypeDef* COM_USART[];
+
+/**
+  * @}
+  */
+
+/** @addtogroup STM32H747I_DISCO_LOW_LEVEL_Exported_Functions
+  * @{
+  */
+int32_t  BSP_GetVersion(void);
+const uint8_t* BSP_GetBoardName(void);
+const uint8_t* BSP_GetBoardID(void);
+
+int32_t  BSP_LED_Init(Led_TypeDef Led);
+int32_t  BSP_LED_DeInit(Led_TypeDef Led);
+int32_t  BSP_LED_On(Led_TypeDef Led);
+int32_t  BSP_LED_Off(Led_TypeDef Led);
+int32_t  BSP_LED_Toggle(Led_TypeDef Led);
+int32_t  BSP_LED_GetState (Led_TypeDef Led);
+int32_t  BSP_PB_Init(Button_TypeDef Button, ButtonMode_TypeDef ButtonMode);
+int32_t  BSP_PB_DeInit(Button_TypeDef Button);
+int32_t  BSP_PB_GetState(Button_TypeDef Button);
+void     BSP_PB_Callback(Button_TypeDef Button);
+#if (USE_BSP_COM_FEATURE > 0)
+int32_t  BSP_COM_Init(COM_TypeDef COM, COM_InitTypeDef *COM_Init);
+int32_t  BSP_COM_DeInit(COM_TypeDef COM);
+#if( USE_COM_LOG > 0)
+int32_t  BSP_COM_SelectLogPort (COM_TypeDef COM);
+#endif
+
+#if (USE_HAL_UART_REGISTER_CALLBACKS == 1)
+int32_t BSP_COM_RegisterDefaultMspCallbacks(COM_TypeDef COM);
+int32_t BSP_COM_RegisterMspCallbacks(COM_TypeDef COM, BSP_COM_Cb_t *Callback);
+#endif /* USE_HAL_UART_REGISTER_CALLBACKS */
+HAL_StatusTypeDef MX_USART1_Init(UART_HandleTypeDef *huart, MX_UART_InitTypeDef *COM_Init);
+#endif
+
+
+int32_t  BSP_JOY_Init(JOY_TypeDef JOY, JOYMode_TypeDef JoyMode,  JOYPin_TypeDef JoyPins);
+int32_t  BSP_JOY_DeInit(JOY_TypeDef JOY,  JOYPin_TypeDef JoyPins);
+int32_t  BSP_JOY_GetState(JOY_TypeDef JOY,uint32_t JoyPin);
+void     BSP_JOY_Callback(JOY_TypeDef JOY, uint32_t JoyPin);
+void     BSP_JOY_IRQHandler(JOY_TypeDef JOY, JOYPin_TypeDef JoyPin);
+
+void BSP_JOY_IRQHandler(JOY_TypeDef JOY, JOYPin_TypeDef JoyPin);
+void BSP_PB_IRQHandler(Button_TypeDef Button);
 /**
   * @}
   */
@@ -350,12 +368,11 @@ void             BSP_ErrorNotify(void);
 /**
   * @}
   */
-
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __STM32H747I_DISCOVERY_H */
+#endif /* STM32H747I_DISCO_H */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

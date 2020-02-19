@@ -7,7 +7,7 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
+  * <h2><center>&copy; Copyright (c) 2018 STMicroelectronics.
   * All rights reserved.</center></h2>
   *
   * This software component is licensed by ST under BSD 3-Clause license,
@@ -16,118 +16,110 @@
   *                        opensource.org/licenses/BSD-3-Clause
   *
   ******************************************************************************
-  */ 
+  */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __STM32H747I_DISCOVERY_SDRAM_H
-#define __STM32H747I_DISCOVERY_SDRAM_H
+#ifndef STM32H747I_DISCO_SDRAM_H
+#define STM32H747I_DISCO_SDRAM_H
 
 #ifdef __cplusplus
  extern "C" {
-#endif 
+#endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32h7xx_hal.h"
+#include "stm32h747i_discovery_conf.h"
+#include "stm32h747i_discovery_errno.h"
+#include "../Components/is42s32800j/is42s32800j.h"
 
 /** @addtogroup BSP
   * @{
-  */ 
+  */
 
-/** @addtogroup STM32H747I_DISCOVERY
+/** @addtogroup STM32H747I_DISCO
   * @{
   */
-    
-/** @addtogroup STM32H747I_DISCOVERY_SDRAM
-  * @{
-  */    
 
-/** @defgroup STM32H747I_DISCOVERY_SDRAM_Exported_Constants Exported Constants
+/** @defgroup STM32H747I_DISCO_SDRAM SDRAM
   * @{
   */
-/** 
-  * @brief  SDRAM status structure definition  
-  */     
-#define   SDRAM_OK         ((uint8_t)0x00)
-#define   SDRAM_ERROR      ((uint8_t)0x01)
 
-#define SDRAM_DEVICE_ADDR  ((uint32_t)0xD0000000)
-#define SDRAM_DEVICE_SIZE  ((uint32_t)0x2000000)  /* SDRAM device size in MBytes */
-
-/* #define SDRAM_MEMORY_WIDTH            FMC_SDRAM_MEM_BUS_WIDTH_8  */
-/* #define SDRAM_MEMORY_WIDTH            FMC_SDRAM_MEM_BUS_WIDTH_16 */
-#define SDRAM_MEMORY_WIDTH               FMC_SDRAM_MEM_BUS_WIDTH_32
-
-#define SDCLOCK_PERIOD                   FMC_SDRAM_CLOCK_PERIOD_2
-/* #define SDCLOCK_PERIOD                FMC_SDRAM_CLOCK_PERIOD_3 */   
-
-#define REFRESH_COUNT                    ((uint32_t)0x0603)   /* SDRAM refresh counter (100Mhz SD clock) */
-   
-#define SDRAM_TIMEOUT                    ((uint32_t)0xFFFF)
-
-/* DMA definitions for SDRAM DMA transfer */
-#define __MDMAx_CLK_ENABLE                 __HAL_RCC_MDMA_CLK_ENABLE
-#define __MDMAx_CLK_DISABLE                __HAL_RCC_MDMA_CLK_DISABLE
-#define SDRAM_MDMAx_CHANNEL               MDMA_Channel0  
-#define SDRAM_MDMAx_IRQn                  MDMA_IRQn
-
-  
-/**
-  * @brief  FMC SDRAM Mode definition register defines
-  */
-#define SDRAM_MODEREG_BURST_LENGTH_1             ((uint16_t)0x0000)
-#define SDRAM_MODEREG_BURST_LENGTH_2             ((uint16_t)0x0001)
-#define SDRAM_MODEREG_BURST_LENGTH_4             ((uint16_t)0x0002)
-#define SDRAM_MODEREG_BURST_LENGTH_8             ((uint16_t)0x0004)
-#define SDRAM_MODEREG_BURST_TYPE_SEQUENTIAL      ((uint16_t)0x0000)
-#define SDRAM_MODEREG_BURST_TYPE_INTERLEAVED     ((uint16_t)0x0008)
-#define SDRAM_MODEREG_CAS_LATENCY_2              ((uint16_t)0x0020)
-#define SDRAM_MODEREG_CAS_LATENCY_3              ((uint16_t)0x0030)
-#define SDRAM_MODEREG_OPERATING_MODE_STANDARD    ((uint16_t)0x0000)
-#define SDRAM_MODEREG_WRITEBURST_MODE_PROGRAMMED ((uint16_t)0x0000) 
-#define SDRAM_MODEREG_WRITEBURST_MODE_SINGLE     ((uint16_t)0x0200) 
-/**
-  * @}
-  */ 
-  
-   
-/** @addtogroup STM32H747I_DISCOVERY_SDRAM_Exported_Functions
+/** @defgroup STM32H747I_DISCO_SDRAM_Exported_Types Exported Types
   * @{
-  */  
-uint8_t BSP_SDRAM_Init(void);
-uint8_t BSP_SDRAM_DeInit(void);
-void    BSP_SDRAM_Initialization_sequence(uint32_t RefreshCount);
-uint8_t BSP_SDRAM_ReadData(uint32_t uwStartAddress, uint32_t *pData, uint32_t uwDataSize);
-uint8_t BSP_SDRAM_ReadData_DMA(uint32_t uwStartAddress, uint32_t *pData, uint32_t uwDataSize);
-uint8_t BSP_SDRAM_WriteData(uint32_t uwStartAddress, uint32_t *pData, uint32_t uwDataSize);
-uint8_t BSP_SDRAM_WriteData_DMA(uint32_t uwStartAddress, uint32_t *pData, uint32_t uwDataSize);
-uint8_t BSP_SDRAM_Sendcmd(FMC_SDRAM_CommandTypeDef *SdramCmd);
-   
-/* These functions can be modified in case the current settings (e.g. DMA stream)
-   need to be changed for specific application needs */
-void    BSP_SDRAM_MspInit(SDRAM_HandleTypeDef  *hsdram, void *Params);
-void    BSP_SDRAM_MspDeInit(SDRAM_HandleTypeDef  *hsdram, void *Params);
+  */
+#if (USE_HAL_SDRAM_REGISTER_CALLBACKS == 1)
+typedef struct
+{
+  void (* pMspInitCb)(SDRAM_HandleTypeDef *);
+  void (* pMspDeInitCb)(SDRAM_HandleTypeDef *);
+}BSP_SDRAM_Cb_t;
+#endif /* (USE_HAL_SDRAM_REGISTER_CALLBACKS == 1) */
+/**
+  * @}
+  */
 
+/** @defgroup STM32H747I_DISCO_SDRAM_Exported_Constants Exported Constants
+  * @{
+  */
+#define SDRAM_INSTANCES_NBR       1U
+#define SDRAM_DEVICE_ADDR         0xD0000000U
+#define SDRAM_DEVICE_SIZE         0x2000000U
+
+/* MDMA definitions for SDRAM DMA transfer */
+#define SDRAM_MDMAx_CLK_ENABLE             __HAL_RCC_MDMA_CLK_ENABLE
+#define SDRAM_MDMAx_CLK_DISABLE            __HAL_RCC_MDMA_CLK_DISABLE
+#define SDRAM_MDMAx_CHANNEL                MDMA_Channel0
+#define SDRAM_MDMAx_IRQn                   MDMA_IRQn
+#define SDRAM_MDMA_IRQHandler              MDMA_IRQHandler
 
 /**
   * @}
-  */ 
+  */
+
+/** @addtogroup STM32H747I_DISCO_SDRAM_Exported_Variables
+  * @{
+  */
+extern SDRAM_HandleTypeDef hsdram[];
+/**
+  * @}
+  */
+
+/** @addtogroup STM32H747I_DISCO_SDRAM_Exported_Functions
+  * @{
+  */
+int32_t BSP_SDRAM_Init(uint32_t Instance);
+int32_t BSP_SDRAM_DeInit(uint32_t Instance);
+#if (USE_HAL_SDRAM_REGISTER_CALLBACKS == 1)
+int32_t BSP_SDRAM_RegisterDefaultMspCallbacks (uint32_t Instance);
+int32_t BSP_SDRAM_RegisterMspCallbacks (uint32_t Instance, BSP_SDRAM_Cb_t *CallBacks);
+#endif /* (USE_HAL_SDRAM_REGISTER_CALLBACKS == 1)  */
+int32_t BSP_SDRAM_SendCmd(uint32_t Instance, FMC_SDRAM_CommandTypeDef *SdramCmd);
+
+void BSP_SDRAM_IRQHandler(uint32_t Instance);
+
+/* These functions can be modified in case the current settings need to be
+   changed for specific application needs */
+HAL_StatusTypeDef MX_SDRAM_Init(SDRAM_HandleTypeDef *hSdram);
 
 /**
   * @}
-  */ 
+  */
 
 /**
   * @}
-  */ 
+  */
 
 /**
   * @}
-  */ 
+  */
+
+/**
+  * @}
+  */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __STM32H747I_DISCOVERY_SDRAM_H */
+#endif /* STM32H747I_DISCO_SDRAM_H */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

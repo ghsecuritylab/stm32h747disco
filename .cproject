@@ -15,11 +15,11 @@
 				</extensions>
 			</storageModule>
 			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
-				<configuration artifactName="${ProjName}" buildProperties="" description="" id="0.78511047" name="Default" optionalBuildProperties="org.eclipse.cdt.docker.launcher.containerbuild.property.volumes=,org.eclipse.cdt.docker.launcher.containerbuild.property.selectedvolumes=" parent="org.eclipse.cdt.build.core.prefbase.cfg">
+				<configuration artifactName="${ProjName}" buildProperties="" description="" id="0.78511047" name="Default" optionalBuildProperties="org.eclipse.cdt.docker.launcher.containerbuild.property.selectedvolumes=,org.eclipse.cdt.docker.launcher.containerbuild.property.volumes=" parent="org.eclipse.cdt.build.core.prefbase.cfg">
 					<folderInfo id="0.78511047." name="/" resourcePath="">
 						<toolChain id="org.eclipse.cdt.build.core.prefbase.toolchain.922644828" name="No ToolChain" resourceTypeBasedDiscovery="false" superClass="org.eclipse.cdt.build.core.prefbase.toolchain">
 							<targetPlatform binaryParser="org.eclipse.cdt.core.ELF" id="org.eclipse.cdt.build.core.prefbase.toolchain.922644828.1436264033" name=""/>
-							<builder id="org.eclipse.cdt.build.core.settings.default.builder.1098600423" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="org.eclipse.cdt.build.core.settings.default.builder"/>
+							<builder id="org.eclipse.cdt.build.core.settings.default.builder.1098600423" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" parallelBuildOn="true" parallelizationNumber="7" superClass="org.eclipse.cdt.build.core.settings.default.builder"/>
 							<tool id="org.eclipse.cdt.build.core.settings.holder.libs.236666789" name="holder for library settings" superClass="org.eclipse.cdt.build.core.settings.holder.libs"/>
 							<tool id="org.eclipse.cdt.build.core.settings.holder.1768859017" name="Assembly" superClass="org.eclipse.cdt.build.core.settings.holder">
 								<inputType id="org.eclipse.cdt.build.core.settings.holder.inType.206126883" languageId="org.eclipse.cdt.core.assembly" languageName="Assembly" sourceContentType="org.eclipse.cdt.core.asmSource" superClass="org.eclipse.cdt.build.core.settings.holder.inType"/>
@@ -42,6 +42,9 @@
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/lan8742}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/mt25tl01g}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/otm8009a}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/wm8994}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/Common}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/is42s32800j}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/LwIP/src/include}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/LwIP/system}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/LwIP/src/apps/httpd}&quot;"/>
@@ -49,11 +52,15 @@
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/include}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Utilities}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FatFs/src}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FatFs/src/option}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Utilities/Lcd_Trace}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Utilities/Basic_GUI}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Utilities/Fonts}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/Network/Src}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/Network/Inc}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/CM7/Inc}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/Logger/LCDLog}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/FatFs/Inc}&quot;"/>
 									<!--wildcard_c_includes-->
 
 								</option>
@@ -76,6 +83,9 @@
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/lan8742}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/mt25tl01g}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/otm8009a}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/wm8994}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/Common}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Drivers/BSP/Components/is42s32800j}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/LwIP/src/include}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/LwIP/system}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/LwIP/src/apps/httpd}&quot;"/>
@@ -83,11 +93,15 @@
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/include}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Utilities}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FatFs/src}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Middlewares/Third_Party/FatFs/src/option}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Utilities/Lcd_Trace}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Utilities/Basic_GUI}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Utilities/Fonts}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/Network/Src}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/Network/Inc}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/CM7/Inc}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/Logger/LCDLog}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/stm32h747disco/Core/FatFs/Inc}&quot;"/>
 									<!--wildcard_c_includes-->
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="org.eclipse.cdt.build.core.settings.holder.symbols.1546279114" superClass="org.eclipse.cdt.build.core.settings.holder.symbols" valueType="definedSymbols">
@@ -100,9 +114,9 @@
 <listOptionValue builtIn="false" value="VERSION=&quot;1.0.1&quot;"/>
 <listOptionValue builtIn="false" value="IS_BETA=0"/>
 <listOptionValue builtIn="false" value="APP_NUMBER=1"/>
-<listOptionValue builtIn="false" value="COMMIT_HASH=&quot;81dd172&quot;"/>
-<listOptionValue builtIn="false" value="BRANCH_NAME=&quot;testing&quot;"/>
-<listOptionValue builtIn="false" value="CODE_VERSION=&quot;v0.0.3-3-g81dd172&quot;"/>
+<listOptionValue builtIn="false" value="COMMIT_HASH=&quot;44394e7&quot;"/>
+<listOptionValue builtIn="false" value="BRANCH_NAME=&quot;master&quot;"/>
+<listOptionValue builtIn="false" value="CODE_VERSION=&quot;v0.0.3-4-g44394e7&quot;"/>
 
 								</option>
 								<inputType id="org.eclipse.cdt.build.core.settings.holder.inType.994335435" languageId="org.eclipse.cdt.core.gcc" languageName="GNU C" sourceContentType="org.eclipse.cdt.core.cSource,org.eclipse.cdt.core.cHeader" superClass="org.eclipse.cdt.build.core.settings.holder.inType"/>

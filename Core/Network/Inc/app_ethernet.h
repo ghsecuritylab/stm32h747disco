@@ -42,8 +42,8 @@
 /*Static IP ADDRESS*/
 #define IP_ADDR0   192
 #define IP_ADDR1   168
-#define IP_ADDR2   0
-#define IP_ADDR3   20
+#define IP_ADDR2   10
+#define IP_ADDR3   100
 
 /*NETMASK*/
 #define NETMASK_ADDR0   255

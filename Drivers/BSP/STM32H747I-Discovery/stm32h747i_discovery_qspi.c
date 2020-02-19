@@ -3,39 +3,51 @@
   * @file    stm32h747i_discovery_qspi.c
   * @author  MCD Application Team
   * @brief   This file includes a standard driver for the MT25TL01G QSPI
-  *          memory mounted on STM32H747I-DISCOVERY board.
-  @verbatim
-  ==============================================================================
-                     ##### How to use this driver #####
-  ==============================================================================
-  [..]
-   (#) This driver is used to drive the MT25TL01G QSPI external
-       memory mounted on STM32H747I-DISCOVERY board.
+  *          memory mounted on STM32H747I-DISCO board.
+    @verbatim
+  How To use this driver:
+  -----------------------
+   - This driver is used to drive the MT25TL01G QSPI external
+       memory mounted on STM32H747I-DISCO board.
 
-   (#) This driver need a specific component driver (MT25TL01G) to be included with.
+   - This driver need a specific component driver (MT25TL01G) to be included with.
 
-   (#) Initialization steps:
-       (++) Initialize the QPSI external memory using the BSP_QSPI_Init() function. This
+  Driver description:
+  -------------------
+   - Initialization steps:
+       + Initialize the QPSI external memory using the BSP_QSPI_Init() function. This
             function includes the MSP layer hardware resources initialization and the
             QSPI interface with the external memory.
+         STR and DTR transfer rates are supported.
+         SPI, SPI 2-IO, SPI-4IO and QPI modes are supported
 
-   (#) QSPI memory operations
-       (++) QSPI memory can be accessed with read/write operations once it is
+   - QSPI memory operations
+       + QSPI memory can be accessed with read/write operations once it is
             initialized.
             Read/write operation can be performed with AHB access using the functions
             BSP_QSPI_Read()/BSP_QSPI_Write().
-       (++) The function BSP_QSPI_GetInfo() returns the configuration of the QSPI memory.
+       + The function BSP_QSPI_GetInfo() returns the configuration of the QSPI memory.
             (see the QSPI memory data sheet)
-       (++) Perform erase block operation using the function BSP_QSPI_Erase_Block() and by
+       + Perform erase block operation using the function BSP_QSPI_EraseBlock() and by
             specifying the block address. You can perform an erase operation of the whole
-            chip by calling the function BSP_QSPI_Erase_Chip().
-       (++) The function BSP_QSPI_GetStatus() returns the current status of the QSPI memory.
+            chip by calling the function BSP_QSPI_EraseChip().
+       + The function BSP_QSPI_GetStatus() returns the current status of the QSPI memory.
             (see the QSPI memory data sheet)
+       + The function BSP_QSPI_EnableMemoryMappedMode enables the QSPI memory mapped mode
+       + The function BSP_QSPI_DisableMemoryMappedMode disables the QSPI memory mapped mode
+       + The function BSP_QSPI_ConfigFlash() allow to configure the QSPI mode and transfer rate
+
+  Note:
+  --------
+    Regarding the "Instance" parameter, needed for all functions, it is used to select
+    an QSPI instance. On the STM32H747I_DISCO board, there's one instance. Then, this
+    parameter should be 0.
+
   @endverbatim
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
+  * <h2><center>&copy; Copyright (c) 2018 STMicroelectronics.
   * All rights reserved.</center></h2>
   *
   * This software component is licensed by ST under BSD 3-Clause license,
@@ -53,430 +65,764 @@
   * @{
   */
 
-/** @addtogroup STM32H747I_DISCOVERY
+/** @addtogroup STM32H747I_DISCO
   * @{
   */
 
-/** @defgroup STM32H747I_DISCOVERY_QSPI STM32H747I_DISCOVERY_QSPI
+/** @defgroup STM32H747I_DISCO_QSPI QSPI
   * @{
   */
-
 
 /* Private variables ---------------------------------------------------------*/
 
-/** @defgroup STM32H747I_DISCOVERY_QSPI_Private_Variables Private Variables
+/** @defgroup STM32H747I_DISCO_QSPI_Exported_Variables Exported Variables
   * @{
   */
-QSPI_HandleTypeDef QSPIHandle;
-
+QSPI_HandleTypeDef hqspi;
+BSP_QSPI_Ctx_t     QSPI_Ctx[QSPI_INSTANCES_NUMBER];
 /**
   * @}
   */
 
 /* Private functions ---------------------------------------------------------*/
 
-/** @defgroup STM32H747I_DISCOVERY_QSPI_Private_Functions Private Functions
+/** @defgroup STM32H747I_DISCO_QSPI_Private_Functions Private Functions
   * @{
   */
-static uint8_t QSPI_ResetMemory          (QSPI_HandleTypeDef *hqspi);
-static uint8_t QSPI_EnterFourBytesAddress(QSPI_HandleTypeDef *hqspi);
-static uint8_t QSPI_DummyCyclesCfg       (QSPI_HandleTypeDef *hqspi);
-static uint8_t QSPI_WriteEnable          (QSPI_HandleTypeDef *hqspi);
-static uint8_t QSPI_AutoPollingMemReady(QSPI_HandleTypeDef *hqspi, uint32_t Timeout);
-static uint8_t QSPI_EnterQPI(QSPI_HandleTypeDef *hqspi);
+static void QSPI_MspInit(QSPI_HandleTypeDef *hQspi);
+static void QSPI_MspDeInit(QSPI_HandleTypeDef *hSspi);
+static int32_t QSPI_ResetMemory(uint32_t Instance);
+static int32_t QSPI_DummyCyclesCfg(uint32_t Instance);
+
 /**
   * @}
   */
 
-/** @defgroup STM32H747I_DISCOVERY_QSPI_Exported_Functions Exported Functions
+/** @defgroup STM32H747I_DISCO_QSPI_Exported_Functions Exported Functions
   * @{
   */
 
 /**
   * @brief  Initializes the QSPI interface.
-  * @retval QSPI memory status
+  *         Instance management :
+  *         Instance can running at Indirect or MMP mode.
+  *         Every indirect instance can switch between.
+  *         Once MMP instance active then Instance switch function disabled.
+  *         Only 1 MMP instance can run.
+  *         Instance switch function enabled after MMP instance exit to Indirect mode.
+  *
+  *         MT25TL01G action :
+  *         QE(Quad Enable, Non-volatile) bit of Status Register
+  *         QE = 0; WP# & RESET# pin active
+  *                 Accept 1-1-1, 1-1-2, 1-2-2 commands
+  *         QE = 1; WP# become SIO2 pin, RESET# become SIO3 pin
+  *                 Accept 1-1-1, 1-1-2, 1-2-2, 1-1-4, 1-4-4 commands
+  *         Enter QPI mode by issue EQIO(0x35) command from 1-1-1 mode
+  *                 Accept 4-4-4 commands
+  *         Exit QPI mode by issue RSTQIO(0xF5) command from 4-4-4 mode
+  *                 Accept commands, dependent QE bit status
+  *         Memory Read commands support STR(Single Transfer Rate) & DTR(Double Transfer Rate) mode
+  *
+  *         Force QE = 1, Enter 4-Byte address mode
+  *         Configure Dummy cycle & ODS(Out Driver Strength)
+  *         STR/DTR effect read commands only
+  * @param  Instance   QSPI Instance
+  * @param  Init       QSPI Init structure
+  * @retval BSP status
   */
-uint8_t BSP_QSPI_Init(void)
+int32_t BSP_QSPI_Init(uint32_t Instance, BSP_QSPI_Init_t *Init)
 {
-  QSPIHandle.Instance = QUADSPI;
+  int32_t ret = BSP_ERROR_NONE;
+  BSP_QSPI_Info_t pInfo;
+  MX_QSPI_Init_t qspi_init;
+  /* Table to handle clock prescalers:
+  1: For STR mode to reach max 108Mhz
+  3: For DTR mode to reach max 54Mhz
+  */
+  static const uint32_t PrescalerTab[2] = {1, 3};
 
-  /* Call the DeInit function to reset the driver */
-  if (HAL_QSPI_DeInit(&QSPIHandle) != HAL_OK)
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
   {
-    return QSPI_ERROR;
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    /* Check if instance is already initialized */
+    if(QSPI_Ctx[Instance].IsInitialized == QSPI_ACCESS_NONE)
+    {
+#if (USE_HAL_QSPI_REGISTER_CALLBACKS == 1)
+      /* Register the QSPI MSP Callbacks */
+      if(QSPI_Ctx[Instance].IsMspCallbacksValid == 0UL)
+      {
+        if(BSP_QSPI_RegisterDefaultMspCallbacks(Instance) != BSP_ERROR_NONE)
+        {
+          ret = BSP_ERROR_PERIPH_FAILURE;
+        }
+      }
+#else
+      /* Msp QSPI initialization */
+      QSPI_MspInit(&hqspi);
+#endif /* USE_HAL_QSPI_REGISTER_CALLBACKS */
+
+      if(ret == BSP_ERROR_NONE)
+      {
+        /* STM32 QSPI interface initialization */
+        (void)MT25TL01G_GetFlashInfo(&pInfo);
+        qspi_init.ClockPrescaler = PrescalerTab[Init->TransferRate];
+        qspi_init.DualFlashMode  = QSPI_DUALFLASH_ENABLE;
+        qspi_init.FlashSize      = (uint32_t)POSITION_VAL((uint32_t)pInfo.FlashSize) - 1U;
+        qspi_init.SampleShifting = (Init->TransferRate == BSP_QSPI_STR_TRANSFER) ? QSPI_SAMPLE_SHIFTING_HALFCYCLE : QSPI_SAMPLE_SHIFTING_NONE;
+
+        if(MX_QSPI_Init(&hqspi, &qspi_init) != HAL_OK)
+        {
+          ret = BSP_ERROR_PERIPH_FAILURE;
+        }/* QSPI memory reset */
+        else if(QSPI_ResetMemory(Instance) != BSP_ERROR_NONE)
+        {
+          ret = BSP_ERROR_COMPONENT_FAILURE;
+        }/* Force Flash enter 4 Byte address mode */
+        else if(MT25TL01G_AutoPollingMemReady(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+        {
+          ret = BSP_ERROR_COMPONENT_FAILURE;
+        }
+        else if(MT25TL01G_Enter4BytesAddressMode(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+        {
+          ret = BSP_ERROR_COMPONENT_FAILURE;
+        }/* Configuration of the dummy cycles on QSPI memory side */
+        else if(QSPI_DummyCyclesCfg(Instance) != BSP_ERROR_NONE)
+        {
+          ret = BSP_ERROR_COMPONENT_FAILURE;
+        }
+        else
+        {
+          /* Configure Flash to desired mode */
+          if(BSP_QSPI_ConfigFlash(Instance, Init->InterfaceMode, Init->TransferRate) != BSP_ERROR_NONE)
+          {
+            ret = BSP_ERROR_COMPONENT_FAILURE;
+          }
+        }
+      }
+    }
   }
 
-  /* System level initialization */
-  BSP_QSPI_MspInit(&QSPIHandle, NULL);
-
-  /* QSPI initialization */
-  /* ClockPrescaler set to 1, so QSPI clock = 200MHz / (1+3) = 50MHz */
-  QSPIHandle.Init.ClockPrescaler     = 3;
-  QSPIHandle.Init.FifoThreshold      = 1;
-  QSPIHandle.Init.SampleShifting     = QSPI_SAMPLE_SHIFTING_HALFCYCLE;
-  QSPIHandle.Init.FlashSize          = POSITION_VAL(MT25TL01G_FLASH_SIZE) - 1;
-  QSPIHandle.Init.ChipSelectHighTime = QSPI_CS_HIGH_TIME_3_CYCLE;
-  QSPIHandle.Init.ClockMode          = QSPI_CLOCK_MODE_0;
-  QSPIHandle.Init.FlashID            = QSPI_FLASH_ID_2;
-  QSPIHandle.Init.DualFlash          = QSPI_DUALFLASH_ENABLE;
-
-  if (HAL_QSPI_Init(&QSPIHandle) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  /* QSPI memory reset */
-  if (QSPI_ResetMemory(&QSPIHandle) != QSPI_OK)
-  {
-    return QSPI_NOT_SUPPORTED;
-  }
-
-  /* Set the QSPI memory in 4-bytes address mode */
-  if (QSPI_EnterFourBytesAddress(&QSPIHandle) != QSPI_OK)
-  {
-    return QSPI_NOT_SUPPORTED;
-  }
-
-  /* Configuration of the dummy cycles on QSPI memory side */
-  if (QSPI_DummyCyclesCfg(&QSPIHandle) != QSPI_OK)
-  {
-    return QSPI_NOT_SUPPORTED;
-  }
-
-  return QSPI_OK;
+  /* Return BSP status */
+  return ret;
 }
 
 /**
   * @brief  De-Initializes the QSPI interface.
-  * @retval QSPI memory status
+  * @param  Instance   QSPI Instance
+  * @retval BSP status
   */
-uint8_t BSP_QSPI_DeInit(void)
+int32_t BSP_QSPI_DeInit(uint32_t Instance)
 {
-  QSPIHandle.Instance = QUADSPI;
+  int32_t ret = BSP_ERROR_NONE;
 
-  /* Call the DeInit function to reset the driver */
-  if (HAL_QSPI_DeInit(&QSPIHandle) != HAL_OK)
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
   {
-    return QSPI_ERROR;
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(QSPI_Ctx[Instance].IsInitialized == QSPI_ACCESS_MMP)
+    {
+      if(BSP_QSPI_DisableMemoryMappedMode(Instance) != BSP_ERROR_NONE)
+      {
+        ret = BSP_ERROR_COMPONENT_FAILURE;
+      }
+    }
+
+    if(ret == BSP_ERROR_NONE)
+    {
+      /* Set default QSPI_Ctx values */
+      QSPI_Ctx[Instance].IsInitialized = QSPI_ACCESS_NONE;
+      QSPI_Ctx[Instance].InterfaceMode = BSP_QSPI_SPI_MODE;
+      QSPI_Ctx[Instance].TransferRate  = BSP_QSPI_STR_TRANSFER;
+      QSPI_Ctx[Instance].DualFlashMode = QSPI_DUALFLASH_ENABLE;
+
+#if (USE_HAL_QSPI_REGISTER_CALLBACKS == 0)
+      QSPI_MspDeInit(&hqspi);
+#endif /* (USE_HAL_QSPI_REGISTER_CALLBACKS == 0) */
+
+      /* Call the DeInit function to reset the driver */
+      if (HAL_QSPI_DeInit(&hqspi) != HAL_OK)
+      {
+        ret = BSP_ERROR_PERIPH_FAILURE;
+      }
+    }
   }
 
-  /* System level De-initialization */
-  BSP_QSPI_MspDeInit(&QSPIHandle, NULL);
-
-  return QSPI_OK;
+  /* Return BSP status */
+  return ret;
 }
 
 /**
-  * @brief  Reads an amount of data from the QSPI memory.
-  * @param  pData: Pointer to data to be read
-  * @param  ReadAddr: Read start address
-  * @param  Size: Size of data to read
-  * @retval QSPI memory status
+  * @brief  Initializes the QSPI interface.
+  * @param  hQspi       QSPI handle
+  * @param  Config      QSPI configuration structure
+  * @retval BSP status
   */
-uint8_t BSP_QSPI_Read(uint8_t* pData, uint32_t ReadAddr, uint32_t Size)
+__weak HAL_StatusTypeDef MX_QSPI_Init(QSPI_HandleTypeDef *hQspi, MX_QSPI_Init_t *Config)
 {
-  QSPI_CommandTypeDef s_command;
-  
-  /* Initialize the read command */
-  s_command.InstructionMode   = QSPI_INSTRUCTION_4_LINES;
-  s_command.Instruction       = QUAD_INOUT_FAST_READ_DTR_CMD; /* DTR QUAD INPUT/OUTPUT FAST READ and 4-BYTE DTR FAST READ commands */
-  s_command.AddressMode       = QSPI_ADDRESS_4_LINES;
-  s_command.AddressSize       = QSPI_ADDRESS_32_BITS;
-  s_command.Address           = ReadAddr;
-  s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  s_command.DataMode          = QSPI_DATA_4_LINES;
-  s_command.DummyCycles       = MT25TL01G_DUMMY_CYCLES_READ_QUAD_DTR - 1;
-  s_command.NbData            = Size;
-  s_command.DdrMode           = QSPI_DDR_MODE_ENABLE;
-  s_command.DdrHoldHalfCycle  = QSPI_DDR_HHC_HALF_CLK_DELAY;
-  s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-  
-  /* Configure the command */
-  if (HAL_QSPI_Command(&QSPIHandle, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  /* QSPI initialization */
+  /* QSPI freq = SYSCLK /(1 + ClockPrescaler) Mhz */
+  hQspi->Instance                = QUADSPI;
+  hQspi->Init.ClockPrescaler     = Config->ClockPrescaler;
+  hQspi->Init.FifoThreshold      = 1;
+  hQspi->Init.SampleShifting     = Config->SampleShifting;
+  hQspi->Init.FlashSize          = Config->FlashSize;
+  hQspi->Init.ChipSelectHighTime = QSPI_CS_HIGH_TIME_4_CYCLE; /* Min 50ns for nonRead */
+  hQspi->Init.ClockMode          = QSPI_CLOCK_MODE_0;
+  hQspi->Init.FlashID            = QSPI_FLASH_ID_1;
+  hQspi->Init.DualFlash          = Config->DualFlashMode;
+
+  return HAL_QSPI_Init(hQspi);
+}
+
+#if (USE_HAL_QSPI_REGISTER_CALLBACKS == 1)
+/**
+  * @brief Default BSP QSPI Msp Callbacks
+  * @param Instance      QSPI Instance
+  * @retval BSP status
+  */
+int32_t BSP_QSPI_RegisterDefaultMspCallbacks (uint32_t Instance)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
   {
-    return QSPI_ERROR;
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    /* Register MspInit/MspDeInit Callbacks */
+    if(HAL_QSPI_RegisterCallback(&hqspi, HAL_QSPI_MSPINIT_CB_ID, QSPI_MspInit) != HAL_OK)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+    else if(HAL_QSPI_RegisterCallback(&hqspi, HAL_QSPI_MSPDEINIT_CB_ID, QSPI_MspDeInit) != HAL_OK)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+    else
+    {
+      QSPI_Ctx[Instance].IsMspCallbacksValid = 1U;
+    }
   }
 
-  /* Reception of the data */
-  if (HAL_QSPI_Receive(&QSPIHandle, pData, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  /* Return BSP status */
+  return ret;
+}
+
+/**
+  * @brief BSP QSPI Msp Callback registering
+  * @param Instance     QSPI Instance
+  * @param CallBacks    pointer to MspInit/MspDeInit callbacks functions
+  * @retval BSP status
+  */
+int32_t BSP_QSPI_RegisterMspCallbacks (uint32_t Instance, BSP_QSPI_Cb_t *CallBacks)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
   {
-    return QSPI_ERROR;
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    /* Register MspInit/MspDeInit Callbacks */
+    if(HAL_QSPI_RegisterCallback(&hqspi, HAL_QSPI_MSPINIT_CB_ID, CallBacks->pMspInitCb) != HAL_OK)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+    else if(HAL_QSPI_RegisterCallback(&hqspi, HAL_QSPI_MSPDEINIT_CB_ID, CallBacks->pMspDeInitCb) != HAL_OK)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+    else
+    {
+      QSPI_Ctx[Instance].IsMspCallbacksValid = 1U;
+    }
   }
 
-  return QSPI_OK;
+  /* Return BSP status */
+  return ret;
+}
+#endif /* (USE_HAL_QSPI_REGISTER_CALLBACKS == 1) */
+
+/**
+  * @brief  Reads an amount of data from the QSPI memory.
+  * @param  Instance  QSPI instance
+  * @param  pData     Pointer to data to be read
+  * @param  ReadAddr  Read start address
+  * @param  Size      Size of data to read
+  * @retval BSP status
+  */
+int32_t BSP_QSPI_Read(uint32_t Instance, uint8_t *pData, uint32_t ReadAddr, uint32_t Size)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(QSPI_Ctx[Instance].TransferRate == BSP_QSPI_STR_TRANSFER)
+    {
+      if(MT25TL01G_ReadSTR(&hqspi, QSPI_Ctx[Instance].InterfaceMode, pData, ReadAddr, Size) != MT25TL01G_OK)
+      {
+        ret = BSP_ERROR_COMPONENT_FAILURE;
+      }
+    }
+    else
+    {
+      if(MT25TL01G_ReadDTR(&hqspi, QSPI_Ctx[Instance].InterfaceMode, pData, ReadAddr, Size) != MT25TL01G_OK)
+      {
+        ret = BSP_ERROR_COMPONENT_FAILURE;
+      }
+    }
+  }
+
+  /* Return BSP status */
+  return ret;
 }
 
 /**
   * @brief  Writes an amount of data to the QSPI memory.
-  * @param  pData: Pointer to data to be written
-  * @param  WriteAddr: Write start address
-  * @param  Size: Size of data to write
-  * @retval QSPI memory status
+  * @param  Instance   QSPI instance
+  * @param  pData      Pointer to data to be written
+  * @param  WriteAddr  Write start address
+  * @param  Size       Size of data to write
+  * @retval BSP status
   */
-uint8_t BSP_QSPI_Write(uint8_t* pData, uint32_t WriteAddr, uint32_t Size)
+int32_t BSP_QSPI_Write(uint32_t Instance, uint8_t *pData, uint32_t WriteAddr, uint32_t Size)
 {
-  QSPI_CommandTypeDef s_command;
+  int32_t ret = BSP_ERROR_NONE;
   uint32_t end_addr, current_size, current_addr;
+  uint8_t *write_data;
 
-  /* Calculation of the size between the write address and the end of the page */
-  current_size = MT25TL01G_PAGE_SIZE - (WriteAddr % MT25TL01G_PAGE_SIZE);
-
-  /* Check if the size of the data is less than the remaining place in the page */
-  if (current_size > Size)
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
   {
-    current_size = Size;
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    /* Calculation of the size between the write address and the end of the page */
+    current_size = MT25TL01G_PAGE_SIZE - (WriteAddr % MT25TL01G_PAGE_SIZE);
+
+    /* Check if the size of the data is less than the remaining place in the page */
+    if (current_size > Size)
+    {
+      current_size = Size;
+    }
+
+    /* Initialize the address variables */
+    current_addr = WriteAddr;
+    end_addr = WriteAddr + Size;
+    write_data = pData;
+
+    /* Perform the write page by page */
+    do
+    {
+      /* Check if Flash busy ? */
+      if(MT25TL01G_AutoPollingMemReady(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+      {
+        ret = BSP_ERROR_COMPONENT_FAILURE;
+      }/* Enable write operations */
+      else if(MT25TL01G_WriteEnable(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+      {
+        ret = BSP_ERROR_COMPONENT_FAILURE;
+      }/* Issue page program command */
+      else if(MT25TL01G_PageProgram(&hqspi, QSPI_Ctx[Instance].InterfaceMode, write_data, current_addr, current_size) != MT25TL01G_OK)
+      {
+        ret = BSP_ERROR_COMPONENT_FAILURE;
+      }/* Configure automatic polling mode to wait for end of program */
+      else if (MT25TL01G_AutoPollingMemReady(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+      {
+        ret = BSP_ERROR_COMPONENT_FAILURE;
+      }
+      else
+      {
+        /* Update the address and size variables for next page programming */
+        current_addr += current_size;
+        write_data += current_size;
+        current_size = ((current_addr + MT25TL01G_PAGE_SIZE) > end_addr) ? (end_addr - current_addr) : MT25TL01G_PAGE_SIZE;
+      }
+    } while ((current_addr < end_addr) && (ret == BSP_ERROR_NONE));
   }
 
-  /* Initialize the address variables */
-  current_addr = WriteAddr;
-  end_addr = WriteAddr + Size;
-
-  /* Initialize the program command */
-  s_command.InstructionMode   = QSPI_INSTRUCTION_4_LINES;
-  s_command.Instruction       = QUAD_IN_FAST_PROG_4_BYTE_ADDR_CMD;
-  s_command.AddressMode       = QSPI_ADDRESS_4_LINES;
-  s_command.AddressSize       = QSPI_ADDRESS_32_BITS;
-  s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  s_command.DataMode          = QSPI_DATA_4_LINES;
-  s_command.DummyCycles       = 0;
-  s_command.DdrMode           = QSPI_DDR_MODE_DISABLE;
-  s_command.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
-  s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-  /* Perform the write page by page */
-  do
-  {
-    s_command.Address = current_addr;
-    s_command.NbData  = current_size;
-
-    /* Enable write operations */
-    if (QSPI_WriteEnable(&QSPIHandle) != QSPI_OK)
-    {
-      return QSPI_ERROR;
-    }
-    
-    /* Configure the command */
-    if (HAL_QSPI_Command(&QSPIHandle, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-    {
-      return QSPI_ERROR;
-    }
-
-    /* Transmission of the data */
-    if (HAL_QSPI_Transmit(&QSPIHandle, pData, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-    {
-      return QSPI_ERROR;
-    }
-
-    /* Configure automatic polling mode to wait for end of program */
-    if (QSPI_AutoPollingMemReady(&QSPIHandle, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != QSPI_OK)
-    {
-      return QSPI_ERROR;
-    }
-
-    /* Update the address and size variables for next page programming */
-    current_addr += current_size;
-    pData += current_size;
-    current_size = ((current_addr + MT25TL01G_PAGE_SIZE) > end_addr) ? (end_addr - current_addr) : MT25TL01G_PAGE_SIZE;
-  } while (current_addr < end_addr);
-
-  return QSPI_OK;
+  /* Return BSP status */
+  return ret;
 }
 
 /**
   * @brief  Erases the specified block of the QSPI memory.
-  * @param  BlockAddress: Block address to erase
-  * @retval QSPI memory status
+  *         MT25TL01G support 4K, 32K, 64K size block erase commands.
+  * @param  Instance     QSPI instance
+  * @param  BlockAddress Block address to erase
+  * @param  BlockSize    Erase Block size
+  * @retval BSP status
   */
-uint8_t BSP_QSPI_Erase_Block(uint32_t BlockAddress)
+int32_t BSP_QSPI_EraseBlock(uint32_t Instance, uint32_t BlockAddress, BSP_QSPI_Erase_t BlockSize)
 {
-  QSPI_CommandTypeDef s_command;
+  int32_t ret = BSP_ERROR_NONE;
 
-  /* Initialize the erase command */
-  s_command.InstructionMode   = QSPI_INSTRUCTION_4_LINES;
-  s_command.Instruction       = SUBSECTOR_ERASE_4_BYTE_ADDR_CMD;
-  s_command.AddressMode       = QSPI_ADDRESS_4_LINES;
-  s_command.AddressSize       = QSPI_ADDRESS_32_BITS;
-  s_command.Address           = BlockAddress;
-  s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  s_command.DataMode          = QSPI_DATA_NONE;
-  s_command.DummyCycles       = 0;
-  s_command.DdrMode           = QSPI_DDR_MODE_DISABLE;
-  s_command.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
-  s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-  /* Enable write operations */
-  if (QSPI_WriteEnable(&QSPIHandle) != QSPI_OK)
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
   {
-    return QSPI_ERROR;
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    /* Check Flash busy ? */
+    if(MT25TL01G_AutoPollingMemReady(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+    {
+      ret = BSP_ERROR_COMPONENT_FAILURE;
+    }/* Enable write operations */
+    else if(MT25TL01G_WriteEnable(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+    {
+      ret = BSP_ERROR_COMPONENT_FAILURE;
+    }
+    else
+    {
+      /* Issue Block Erase command */
+      if(MT25TL01G_BlockErase(&hqspi, QSPI_Ctx[Instance].InterfaceMode, BlockAddress, BlockSize) != MT25TL01G_OK)
+      {
+        ret = BSP_ERROR_COMPONENT_FAILURE;
+      }
+    }
   }
 
-  /* Send the command */
-  if (HAL_QSPI_Command(&QSPIHandle, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  /* Configure automatic polling mode to wait for end of erase */
-  if (QSPI_AutoPollingMemReady(&QSPIHandle, MT25TL01G_SUBSECTOR_ERASE_MAX_TIME) != QSPI_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  return QSPI_OK;
+  /* Return BSP status */
+  return ret;
 }
 
 /**
   * @brief  Erases the entire QSPI memory.
-  * @retval QSPI memory status
+  * @param  Instance  QSPI instance
+  * @retval BSP status
   */
-uint8_t BSP_QSPI_Erase_Chip(void)
+int32_t BSP_QSPI_EraseChip(uint32_t Instance)
 {
-  QSPI_CommandTypeDef s_command;
+  int32_t ret = BSP_ERROR_NONE;
 
-  /* Initialize the erase command */
-  s_command.InstructionMode   = QSPI_INSTRUCTION_4_LINES;
-  s_command.Instruction       = DIE_ERASE_CMD;
-  s_command.AddressMode       = QSPI_ADDRESS_NONE;
-  s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  s_command.DataMode          = QSPI_DATA_NONE;
-  s_command.DummyCycles       = 0;
-  s_command.DdrMode           = QSPI_DDR_MODE_DISABLE;
-  s_command.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
-  s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-  /* Enable write operations */
-  if (QSPI_WriteEnable(&QSPIHandle) != QSPI_OK)
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
   {
-    return QSPI_ERROR;
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    /* Check Flash busy ? */
+    if(MT25TL01G_AutoPollingMemReady(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+    {
+      ret = BSP_ERROR_COMPONENT_FAILURE;
+    }/* Enable write operations */
+    else if (MT25TL01G_WriteEnable(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+    {
+      ret = BSP_ERROR_COMPONENT_FAILURE;
+    }
+    else
+    {
+      /* Issue Chip erase command */
+      if(MT25TL01G_ChipErase(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+      {
+        ret = BSP_ERROR_COMPONENT_FAILURE;
+      }
+    }
   }
 
-  /* Send the command */
-  if (HAL_QSPI_Command(&QSPIHandle, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  /* Configure automatic polling mode to wait for end of erase */
-  if (QSPI_AutoPollingMemReady(&QSPIHandle, MT25TL01G_DIE_ERASE_MAX_TIME) != QSPI_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  return QSPI_OK;
+  /* Return BSP status */
+  return ret;
 }
 
 /**
   * @brief  Reads current status of the QSPI memory.
-  * @retval QSPI memory status
+  *         If WIP != 0 then return busy.
+  * @param  Instance  QSPI instance
+  * @retval QSPI memory status: whether busy or not
   */
-uint8_t BSP_QSPI_GetStatus(void)
+int32_t BSP_QSPI_GetStatus(uint32_t Instance)
 {
-  QSPI_CommandTypeDef s_command;
-  uint16_t reg;
+  int32_t ret = BSP_ERROR_NONE;
+  uint8_t reg;
 
-  /* Initialize the read flag status register command */
-  s_command.InstructionMode   = QSPI_INSTRUCTION_4_LINES;
-  s_command.Instruction       = READ_FLAG_STATUS_REG_CMD;
-  s_command.AddressMode       = QSPI_ADDRESS_NONE;
-  s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  s_command.DataMode          = QSPI_DATA_4_LINES;
-  s_command.DummyCycles       = 0;
-  s_command.NbData            = 1;
-  s_command.DdrMode           = QSPI_DDR_MODE_DISABLE;
-  s_command.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
-  s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-  /* Configure the command */
-  if (HAL_QSPI_Command(&QSPIHandle, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
   {
-    return QSPI_ERROR;
-  }
-
-  /* Reception of the data */
-  if (HAL_QSPI_Receive(&QSPIHandle, (uint8_t*)(&reg), HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  /* Check the value of the register */
-  if ((reg & (MT25TL01G_FSR_PRERR | MT25TL01G_FSR_PGERR | MT25TL01G_FSR_ERERR)) != 0)
-  {
-    return QSPI_ERROR;
-  }
-  else if ((reg & (MT25TL01G_FSR_PGSUS | MT25TL01G_FSR_ERSUS)) != 0)
-  {
-    return QSPI_SUSPENDED;
-  }
-  else if ((reg & MT25TL01G_FSR_READY) != 0)
-  {
-    return QSPI_OK;
+    ret = BSP_ERROR_WRONG_PARAM;
   }
   else
   {
-    return QSPI_BUSY;
+    if(MT25TL01G_ReadStatusRegister(&hqspi, QSPI_Ctx[Instance].InterfaceMode, &reg) != MT25TL01G_OK)
+    {
+      ret = BSP_ERROR_COMPONENT_FAILURE;
+    }
+    else
+    {
+      /* Check the value of the register */
+      if ((reg & MT25TL01G_SR_WIP) != 0U)
+      {
+        ret = BSP_ERROR_BUSY;
+      }
+    }
   }
+
+  /* Return BSP status */
+  return ret;
 }
 
 /**
   * @brief  Return the configuration of the QSPI memory.
-  * @param  pInfo: pointer on the configuration structure
-  * @retval QSPI memory status
+  * @param  Instance  QSPI instance
+  * @param  pInfo     pointer on the configuration structure
+  * @retval BSP status
   */
-uint8_t BSP_QSPI_GetInfo(QSPI_Info* pInfo)
+int32_t BSP_QSPI_GetInfo(uint32_t Instance, BSP_QSPI_Info_t *pInfo)
 {
-  /* Configure the structure with the memory configuration */
-  pInfo->FlashSize          = MT25TL01G_FLASH_SIZE;
-  pInfo->EraseSectorSize    = (2 * MT25TL01G_SUBSECTOR_SIZE);
-  pInfo->ProgPageSize       = MT25TL01G_PAGE_SIZE;
-  pInfo->EraseSectorsNumber = (MT25TL01G_FLASH_SIZE/pInfo->EraseSectorSize);
-  pInfo->ProgPagesNumber    = (MT25TL01G_FLASH_SIZE/pInfo->ProgPageSize);
-  
-  return QSPI_OK;
+  int32_t ret = BSP_ERROR_NONE;
+
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    (void)MT25TL01G_GetFlashInfo(pInfo);
+  }
+
+  /* Return BSP status */
+  return ret;
 }
 
 /**
   * @brief  Configure the QSPI in memory-mapped mode
-  * @retval QSPI memory status
+  *         Only 1 Instance can running MMP mode. And it will lock system at this mode.
+  * @param  Instance  QSPI instance
+  * @retval BSP status
   */
-uint8_t BSP_QSPI_EnableMemoryMappedMode(void)
+int32_t BSP_QSPI_EnableMemoryMappedMode(uint32_t Instance)
 {
-  QSPI_CommandTypeDef      s_command;
-  QSPI_MemoryMappedTypeDef s_mem_mapped_cfg;
+  int32_t ret = BSP_ERROR_NONE;
 
-  /* Configure the command for the read instruction */
-  s_command.InstructionMode   = QSPI_INSTRUCTION_4_LINES;
-  s_command.Instruction       = QUAD_INOUT_FAST_READ_DTR_CMD; /* DTR QUAD INPUT/OUTPUT FAST READ and 4-BYTE DTR FAST READ commands */
-  s_command.AddressMode       = QSPI_ADDRESS_4_LINES;
-  s_command.AddressSize       = QSPI_ADDRESS_32_BITS;
-  s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  s_command.DataMode          = QSPI_DATA_4_LINES;
-  s_command.DummyCycles       = MT25TL01G_DUMMY_CYCLES_READ_QUAD_DTR - 1;
-  
-  s_command.DdrMode           = QSPI_DDR_MODE_ENABLE;
-  s_command.DdrHoldHalfCycle  = QSPI_DDR_HHC_HALF_CLK_DELAY;
-  s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-  /* Configure the memory mapped mode */
-  s_mem_mapped_cfg.TimeOutActivation = QSPI_TIMEOUT_COUNTER_DISABLE;
-  s_mem_mapped_cfg.TimeOutPeriod     = 0;
-
-  if (HAL_QSPI_MemoryMapped(&QSPIHandle, &s_command, &s_mem_mapped_cfg) != HAL_OK)
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
   {
-    return QSPI_ERROR;
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(QSPI_Ctx[Instance].TransferRate == BSP_QSPI_STR_TRANSFER)
+    {
+      if(MT25TL01G_EnableMemoryMappedModeSTR(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+      {
+        ret = BSP_ERROR_COMPONENT_FAILURE;
+      }
+      else /* Update QSPI context if all operations are well done */
+      {
+        QSPI_Ctx[Instance].IsInitialized = QSPI_ACCESS_MMP;
+      }
+    }
+    else
+    {
+      if(MT25TL01G_EnableMemoryMappedModeDTR(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+      {
+        ret = BSP_ERROR_COMPONENT_FAILURE;
+      }
+      else /* Update QSPI context if all operations are well done */
+      {
+        QSPI_Ctx[Instance].IsInitialized = QSPI_ACCESS_MMP;
+      }
+    }
   }
 
-  return QSPI_OK;
+  /* Return BSP status */
+  return ret;
 }
 
 /**
+  * @brief  Exit form memory-mapped mode
+  *         Only 1 Instance can running MMP mode. And it will lock system at this mode.
+  * @param  Instance  QSPI instance
+  * @retval BSP status
+  */
+int32_t BSP_QSPI_DisableMemoryMappedMode(uint32_t Instance)
+{
+  uint8_t Dummy;
+  int32_t ret = BSP_ERROR_NONE;
+
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(QSPI_Ctx[Instance].IsInitialized != QSPI_ACCESS_MMP)
+    {
+      ret = BSP_ERROR_QSPI_MMP_UNLOCK_FAILURE;
+    }/* Abort MMP back to indirect mode */
+    else if(HAL_QSPI_Abort(&hqspi) != HAL_OK)
+    {
+      ret = BSP_ERROR_PERIPH_FAILURE;
+    }
+    else
+    {
+      /* Force QSPI interface Sampling Shift to half cycle */
+      hqspi.Init.SampleShifting = QSPI_SAMPLE_SHIFTING_HALFCYCLE;
+
+      if(HAL_QSPI_Init(&hqspi)!= HAL_OK)
+      {
+        ret = BSP_ERROR_PERIPH_FAILURE;
+      }
+      /* Dummy read for exit from Performance Enhance mode */
+      else if(MT25TL01G_ReadSTR(&hqspi, QSPI_Ctx[Instance].InterfaceMode, &Dummy, 0, 1) != MT25TL01G_OK)
+      {
+        ret = BSP_ERROR_COMPONENT_FAILURE;
+      }
+      else /* Update QSPI context if all operations are well done */
+      {
+        QSPI_Ctx[Instance].IsInitialized = QSPI_ACCESS_INDIRECT;
+      }
+    }
+  }
+  /* Return BSP status */
+  return ret;
+}
+
+/**
+  * @brief  Get flash ID, 3 Byte
+  *         Manufacturer ID, Memory type, Memory density
+  * @param  Instance  QSPI instance
+  * @param  Id QSPI Identifier
+  * @retval BSP status
+  */
+int32_t BSP_QSPI_ReadID(uint32_t Instance, uint8_t *Id)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    if(MT25TL01G_ReadID(&hqspi, QSPI_Ctx[Instance].InterfaceMode, Id) != MT25TL01G_OK)
+    {
+      ret = BSP_ERROR_COMPONENT_FAILURE;
+    }
+  }
+
+  /* Return BSP status */
+  return ret;
+}
+
+/**
+  * @brief  Set Flash to desired Interface mode. And this instance becomes current instance.
+  *         If current instance running at MMP mode then this function isn't work.
+  *         Indirect -> Indirect
+  * @param  Instance  QSPI instance
+  * @param  Mode      QSPI mode
+  * @param  Rate      QSPI transfer rate
+  * @retval BSP status
+  */
+int32_t BSP_QSPI_ConfigFlash(uint32_t Instance, BSP_QSPI_Interface_t Mode, BSP_QSPI_Transfer_t Rate)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  /* Check if the instance is supported */
+  if(Instance >= QSPI_INSTANCES_NUMBER)
+  {
+    ret = BSP_ERROR_WRONG_PARAM;
+  }
+  else
+  {
+    /* Check if MMP mode locked ************************************************/
+    if(QSPI_Ctx[Instance].IsInitialized == QSPI_ACCESS_MMP)
+    {
+      ret = BSP_ERROR_QSPI_MMP_LOCK_FAILURE;
+    }
+    else
+    {
+      /* Setup MCU transfer rate setting ***************************************************/
+      hqspi.Init.SampleShifting = (Rate == BSP_QSPI_STR_TRANSFER) ? QSPI_SAMPLE_SHIFTING_HALFCYCLE : QSPI_SAMPLE_SHIFTING_NONE;
+
+      if(HAL_QSPI_Init(&hqspi)!= HAL_OK)
+      {
+        ret = BSP_ERROR_PERIPH_FAILURE;
+      }
+      else
+      {
+        /* Setup Flash interface ***************************************************/
+        switch(QSPI_Ctx[Instance].InterfaceMode)
+        {
+        case MT25TL01G_QPI_MODE :               /* 4-4-4 commands */
+          if(Mode != MT25TL01G_QPI_MODE)
+          {
+            if(MT25TL01G_ExitQPIMode(&hqspi) != MT25TL01G_OK)
+            {
+              ret = BSP_ERROR_COMPONENT_FAILURE;
+            }
+          }
+          break;
+
+        case BSP_QSPI_SPI_MODE :               /* 1-1-1 commands, Power on H/W default setting */
+        case BSP_QSPI_SPI_2IO_MODE :           /* 1-2-2 read commands */
+        case BSP_QSPI_SPI_4IO_MODE :           /* 1-4-4 read commands */
+        default :
+          if(Mode == MT25TL01G_QPI_MODE)
+          {
+            if(MT25TL01G_EnterQPIMode(&hqspi) != MT25TL01G_OK)
+            {
+              ret = BSP_ERROR_COMPONENT_FAILURE;
+            }
+          }
+          break;
+        }
+
+        /* Update QSPI context if all operations are well done */
+        if(ret == BSP_ERROR_NONE)
+        {
+          /* Update current status parameter *****************************************/
+          QSPI_Ctx[Instance].IsInitialized = QSPI_ACCESS_INDIRECT;
+          QSPI_Ctx[Instance].InterfaceMode = Mode;
+          QSPI_Ctx[Instance].TransferRate  = Rate;
+        }
+      }
+    }
+  }
+
+  /* Return BSP status */
+  return ret;
+}
+
+/**
+  * @}
+  */
+
+/** @defgroup STM32H747I_DISCO_QSPI_Private_Functions Private Functions
+  * @{
+  */
+
+/**
   * @brief QSPI MSP Initialization
+  * @param hQspi : QSPI handle
   *        This function configures the hardware resources used in this example:
   *           - Peripheral's clock enable
   *           - Peripheral's GPIO Configuration
   *           - NVIC configuration for QSPI interrupt
   * @retval None
   */
-__weak void BSP_QSPI_MspInit(QSPI_HandleTypeDef *hqspi, void *Params)
+static void QSPI_MspInit(QSPI_HandleTypeDef *hQspi)
 {
   GPIO_InitTypeDef gpio_init_structure;
 
@@ -553,20 +899,20 @@ __weak void BSP_QSPI_MspInit(QSPI_HandleTypeDef *hqspi, void *Params)
   /* NVIC configuration for QSPI interrupt */
   HAL_NVIC_SetPriority(QUADSPI_IRQn, 0x0F, 0);
   HAL_NVIC_EnableIRQ(QUADSPI_IRQn);
-
 }
 
 /**
   * @brief QSPI MSP De-Initialization
+  * @param hQspi  QSPI handle
   *        This function frees the hardware resources used in this example:
   *          - Disable the Peripheral's clock
   *          - Revert GPIO and NVIC configuration to their default state
   * @retval None
   */
-__weak void BSP_QSPI_MspDeInit(QSPI_HandleTypeDef *hqspi, void *Params)
+static void QSPI_MspDeInit(QSPI_HandleTypeDef *hQspi)
 {
-  /*##-1- Disable the NVIC for QSPI ###########################################*/
-  HAL_NVIC_DisableIRQ(QUADSPI_IRQn);
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(hQspi);
 
   /*##-2- Disable peripherals and GPIO Clocks ################################*/
   /* De-Configure QSPI pins */
@@ -593,130 +939,63 @@ __weak void BSP_QSPI_MspDeInit(QSPI_HandleTypeDef *hqspi, void *Params)
 }
 
 /**
-  * @}
+  * @brief  This function reset the QSPI Flash memory.
+  *         Fore QPI+SPI reset to avoid system come from unknown status.
+  *         Flash accept 1-1-1, 1-1-2, 1-2-2 commands after reset.
+  * @param  Instance  QSPI instance
+  * @retval BSP status
   */
-
-/** @defgroup STM32H747I_DISCOVERY_QSPI_Private_Functions Private Functions
-  * @{
-  */
-
-/**
-  * @brief  This function reset the QSPI memory.
-  * @param  hqspi: QSPI handle
-  * @retval None
-  */
-static uint8_t QSPI_ResetMemory(QSPI_HandleTypeDef *hqspi)
+static int32_t QSPI_ResetMemory(uint32_t Instance)
 {
-  QSPI_CommandTypeDef s_command;
+  int32_t ret = BSP_ERROR_NONE;
 
-  /* Initialize the reset enable command */
-  s_command.InstructionMode   = QSPI_INSTRUCTION_1_LINE;
-  s_command.Instruction       = RESET_ENABLE_CMD;
-  s_command.AddressMode       = QSPI_ADDRESS_NONE;
-  s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  s_command.DataMode          = QSPI_DATA_NONE;
-  s_command.DummyCycles       = 0;
-  s_command.DdrMode           = QSPI_DDR_MODE_DISABLE;
-  s_command.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
-  s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-  /* Send the command */
-  if (HAL_QSPI_Command(hqspi, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  /* Send RESET ENABLE command in QPI mode (QUAD I/Os, 4-4-4) */
+  if(MT25TL01G_ResetEnable(&hqspi, MT25TL01G_QPI_MODE) != MT25TL01G_OK)
   {
-    return QSPI_ERROR;
+    ret =BSP_ERROR_COMPONENT_FAILURE;
+  }/* Send RESET memory command in QPI mode (QUAD I/Os, 4-4-4) */
+  else if(MT25TL01G_ResetMemory(&hqspi, MT25TL01G_QPI_MODE) != MT25TL01G_OK)
+  {
+    ret = BSP_ERROR_COMPONENT_FAILURE;
+  }/* Wait Flash ready */
+  else if(MT25TL01G_AutoPollingMemReady(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
+  {
+    ret = BSP_ERROR_COMPONENT_FAILURE;
+  }/* Send RESET ENABLE command in SPI mode (1-1-1) */
+  else if(MT25TL01G_ResetEnable(&hqspi, BSP_QSPI_SPI_MODE) != MT25TL01G_OK)
+  {
+    ret = BSP_ERROR_COMPONENT_FAILURE;
+  }/* Send RESET memory command in SPI mode (1-1-1) */
+  else if(MT25TL01G_ResetMemory(&hqspi, BSP_QSPI_SPI_MODE) != MT25TL01G_OK)
+  {
+    ret = BSP_ERROR_COMPONENT_FAILURE;
+  }
+  else
+  {
+    QSPI_Ctx[Instance].IsInitialized = QSPI_ACCESS_INDIRECT;  /* After reset S/W setting to indirect access   */
+    QSPI_Ctx[Instance].InterfaceMode = BSP_QSPI_SPI_MODE;     /* After reset H/W back to SPI mode by default  */
+    QSPI_Ctx[Instance].TransferRate  = BSP_QSPI_STR_TRANSFER; /* After reset S/W setting to STR mode          */
   }
 
-  /* Send the reset memory command */
-  s_command.Instruction = RESET_MEMORY_CMD;
-  if (HAL_QSPI_Command(hqspi, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-  
-  s_command.InstructionMode   = QSPI_INSTRUCTION_4_LINES;
-  s_command.Instruction       = RESET_ENABLE_CMD;
-  /* Send the command */
-  if (HAL_QSPI_Command(hqspi, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  /* Send the reset memory command */
-  s_command.Instruction = RESET_MEMORY_CMD;
-  if (HAL_QSPI_Command(hqspi, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-  
-  /* Enter QSPI memory in QPI mode */
-  if(QSPI_EnterQPI(&QSPIHandle) != QSPI_OK)
-  {
-    return QSPI_ERROR;
-  }
-  
-  /* Configure automatic polling mode to wait the memory is ready */
-  if (QSPI_AutoPollingMemReady(hqspi, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != QSPI_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  return QSPI_OK;
-}
-
-/**
-  * @brief  This function set the QSPI memory in 4-byte address mode
-  * @param  hqspi: QSPI handle
-  * @retval None
-  */
-static uint8_t QSPI_EnterFourBytesAddress(QSPI_HandleTypeDef *hqspi)
-{
-  QSPI_CommandTypeDef s_command;
-
-  /* Initialize the command */
-  s_command.InstructionMode   = QSPI_INSTRUCTION_4_LINES;
-  s_command.Instruction       = ENTER_4_BYTE_ADDR_MODE_CMD;
-  s_command.AddressMode       = QSPI_ADDRESS_NONE;
-  s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  s_command.DataMode          = QSPI_DATA_NONE;
-  s_command.DummyCycles       = 0;
-  s_command.DdrMode           = QSPI_DDR_MODE_DISABLE;
-  s_command.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
-  s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-  /* Enable write operations */
-  if (QSPI_WriteEnable(hqspi) != QSPI_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  /* Send the command */
-  if (HAL_QSPI_Command(hqspi, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  /* Configure automatic polling mode to wait the memory is ready */
-  if (QSPI_AutoPollingMemReady(hqspi, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != QSPI_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  return QSPI_OK;
+  /* Return BSP status */
+  return ret;
 }
 
 /**
   * @brief  This function configure the dummy cycles on memory side.
-  * @param  hqspi: QSPI handle
-  * @retval None
+  *         Dummy cycle bit locate in Configuration Register[7:6]
+  * @param  Instance  QSPI instance
+  * @retval BSP status
   */
-static uint8_t QSPI_DummyCyclesCfg(QSPI_HandleTypeDef *hqspi)
+static int32_t QSPI_DummyCyclesCfg(uint32_t Instance)
 {
-  QSPI_CommandTypeDef s_command;
-  uint16_t reg = 0;
+    int32_t ret= BSP_ERROR_NONE;
+    QSPI_CommandTypeDef s_command;
+  uint16_t reg=0;
 
   /* Initialize the read volatile configuration register command */
   s_command.InstructionMode   = QSPI_INSTRUCTION_4_LINES;
-  s_command.Instruction       = READ_VOL_CFG_REG_CMD;
+  s_command.Instruction       = MT25TL01G_READ_VOL_CFG_REG_CMD;
   s_command.AddressMode       = QSPI_ADDRESS_NONE;
   s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
   s_command.DataMode          = QSPI_DATA_4_LINES;
@@ -727,152 +1006,43 @@ static uint8_t QSPI_DummyCyclesCfg(QSPI_HandleTypeDef *hqspi)
   s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
 
   /* Configure the command */
-  if (HAL_QSPI_Command(hqspi, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  if (HAL_QSPI_Command(&hqspi, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
-    return QSPI_ERROR;
+    return BSP_ERROR_COMPONENT_FAILURE;
   }
 
   /* Reception of the data */
-  if (HAL_QSPI_Receive(hqspi, (uint8_t *)(&reg), HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  if (HAL_QSPI_Receive(&hqspi, (uint8_t *)(&reg), HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
-    return QSPI_ERROR;
+    return BSP_ERROR_COMPONENT_FAILURE;
   }
 
   /* Enable write operations */
-  if (QSPI_WriteEnable(hqspi) != QSPI_OK)
+  if (MT25TL01G_WriteEnable(&hqspi, QSPI_Ctx[Instance].InterfaceMode) != MT25TL01G_OK)
   {
-    return QSPI_ERROR;
+    return BSP_ERROR_COMPONENT_FAILURE;
   }
 
   /* Update volatile configuration register (with new dummy cycles) */
-  s_command.Instruction = WRITE_VOL_CFG_REG_CMD;
+  s_command.Instruction = MT25TL01G_WRITE_VOL_CFG_REG_CMD;
   MODIFY_REG(reg, 0xF0F0, ((MT25TL01G_DUMMY_CYCLES_READ_QUAD << 4) |
                                (MT25TL01G_DUMMY_CYCLES_READ_QUAD << 12)));
 
   /* Configure the write volatile configuration register command */
-  if (HAL_QSPI_Command(hqspi, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  if (HAL_QSPI_Command(&hqspi, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
-    return QSPI_ERROR;
+    return BSP_ERROR_COMPONENT_FAILURE;
   }
 
   /* Transmission of the data */
-  if (HAL_QSPI_Transmit(hqspi, (uint8_t *)(&reg), HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  if (HAL_QSPI_Transmit(&hqspi, (uint8_t *)(&reg), HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
-    return QSPI_ERROR;
+    return BSP_ERROR_COMPONENT_FAILURE;
   }
 
-  return QSPI_OK;
+  /* Return BSP status */
+  return ret;
 }
-
-/**
-  * @brief  This function send a Write Enable and wait it is effective.
-  * @param  hqspi: QSPI handle
-  * @retval None
-  */
-static uint8_t QSPI_WriteEnable(QSPI_HandleTypeDef *hqspi)
-{
-  QSPI_CommandTypeDef     s_command;
-  QSPI_AutoPollingTypeDef s_config;
-
-  /* Enable write operations */
-  s_command.InstructionMode   = QSPI_INSTRUCTION_4_LINES;
-  s_command.Instruction       = WRITE_ENABLE_CMD;
-  s_command.AddressMode       = QSPI_ADDRESS_NONE;
-  s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  s_command.DataMode          = QSPI_DATA_NONE;
-  s_command.DummyCycles       = 0;
-  s_command.DdrMode           = QSPI_DDR_MODE_DISABLE;
-  s_command.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
-  s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-  if (HAL_QSPI_Command(hqspi, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  /* Configure automatic polling mode to wait for write enabling */
-  s_config.Match           = MT25TL01G_SR_WREN | (MT25TL01G_SR_WREN << 8);
-  s_config.Mask            = MT25TL01G_SR_WREN | (MT25TL01G_SR_WREN << 8);
-  s_config.MatchMode       = QSPI_MATCH_MODE_AND;
-  s_config.StatusBytesSize = 2;
-  s_config.Interval        = 0x10;
-  s_config.AutomaticStop   = QSPI_AUTOMATIC_STOP_ENABLE;
-
-  s_command.Instruction    = READ_STATUS_REG_CMD;
-  s_command.DataMode       = QSPI_DATA_4_LINES;
-
-  if (HAL_QSPI_AutoPolling(hqspi, &s_command, &s_config, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  return QSPI_OK;
-}
-
-/**
-  * @brief  This function read the SR of the memory and wait the EOP.
-  * @param  hqspi: QSPI handle
-  * @param  Timeout: timeout in ms  
-  * @retval None
-  */
-static uint8_t QSPI_AutoPollingMemReady(QSPI_HandleTypeDef *hqspi, uint32_t Timeout)
-{
-  QSPI_CommandTypeDef     s_command;
-  QSPI_AutoPollingTypeDef s_config;
-
-  /* Configure automatic polling mode to wait for memory ready */
-  s_command.InstructionMode   = QSPI_INSTRUCTION_4_LINES;
-  s_command.Instruction       = READ_STATUS_REG_CMD;
-  s_command.AddressMode       = QSPI_ADDRESS_NONE;
-  s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  s_command.DataMode          = QSPI_DATA_4_LINES;
-  s_command.DummyCycles       = 2;
-  s_command.DdrMode           = QSPI_DDR_MODE_DISABLE;
-  s_command.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
-  s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-  s_config.Match           = 0;
-  s_config.MatchMode       = QSPI_MATCH_MODE_AND;
-  s_config.Interval        = 0x10;
-  s_config.AutomaticStop   = QSPI_AUTOMATIC_STOP_ENABLE;
-  s_config.Mask            = MT25TL01G_SR_WIP | (MT25TL01G_SR_WIP <<8);
-  s_config.StatusBytesSize = 2;
-
-  if (HAL_QSPI_AutoPolling(hqspi, &s_command, &s_config, Timeout) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  return QSPI_OK;
-}
-
-/**
-  * @brief  This function enter the QPSI memory in QPI mode
-  * @param  hqspi QSPI handle 
-  * @retval QSPI status
-  */
-static uint8_t QSPI_EnterQPI(QSPI_HandleTypeDef *hqspi)
-{
-  QSPI_CommandTypeDef s_command;
-
-  s_command.InstructionMode   = QSPI_INSTRUCTION_1_LINE;
-  s_command.Instruction       = ENTER_QUAD_CMD;
-  s_command.AddressMode       = QSPI_ADDRESS_NONE;
-  s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  s_command.DataMode          = QSPI_DATA_NONE;
-  s_command.DummyCycles       = 0;
-  s_command.DdrMode           = QSPI_DDR_MODE_DISABLE;
-  s_command.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
-  s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-  if (HAL_QSPI_Command(hqspi, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-  
-  return QSPI_OK;
-}
-
 /**
   * @}
   */

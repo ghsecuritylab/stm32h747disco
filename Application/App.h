@@ -13,7 +13,7 @@
 #include "stm32h747i_discovery.h"
 
 
-void APP_Init();
+void APP_init();
 
 /*<test>*/
 #include <stdint.h>
