@@ -1,5 +1,3 @@
-#include <AudioPlayer.h>
-
 /*
  * Audio.c
  *
@@ -7,12 +5,15 @@
  *      Author: Ericson Joseph
  */
 
+#include "AudioPlayer.h"
 #include "stm32h747i_discovery_audio.h"
 #include "LcdLog.h"
+
 
 #define AUDIO_SIZE	160
 #define ATTENUATOR 1
 #define AUDIO_BUFFER_SIZE  20*2
+
 
 BSP_AUDIO_Init_t AudioPlayInit;
 
@@ -55,6 +56,7 @@ void AudioPlayer_Init() {
 }
 
 void BSP_AUDIO_OUT_TransferComplete_CallBack(uint32_t Instance){
+
 }
 
 

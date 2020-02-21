@@ -18,6 +18,7 @@
   * by use of this software. 
   ******************************************************************************
   */
+#include "FreeRTOS.h"
 
 #define _FFCONF 68300	/* Revision ID */
 
@@ -282,8 +283,8 @@
 /* define the ff_malloc ff_free macros as standard malloc free */
 #if !defined(ff_malloc) && !defined(ff_free)
 #include <stdlib.h>
-#define ff_malloc  malloc
-#define ff_free  free
+#define ff_malloc  pvPortMalloc
+#define ff_free  vPortFree
 #endif
 
 /*--- End of configuration options ---*/

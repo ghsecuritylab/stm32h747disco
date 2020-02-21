@@ -25,6 +25,7 @@
 #include "lwip/ip_addr.h"
 #include "LcdLog.h"
 #include <stdint.h>
+#include "SDFatFs.h"
 
 #ifndef VERSION
 #define VERSION "X.X.X"
@@ -44,7 +45,7 @@ void APP_init()
 	osThreadDef(App_Thread, APP_task, osPriorityNormal, 0, configMINIMAL_STACK_SIZE * 5);
 	osThreadCreate(osThread(App_Thread), NULL);
 
-
+	SDFatFs_Init();
 
 }
 
