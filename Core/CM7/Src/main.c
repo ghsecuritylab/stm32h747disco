@@ -49,7 +49,7 @@ char SDPath[4];
 FS_FileOperationsTypeDef Appli_statetmp = APPLICATION_IDLE;
 FATFS SDFatFs;  /* File system object for SD card logical drive */
 FIL MyFile;     /* File object */
-ALIGN_32BYTES(uint8_t rtext[96]);
+//ALIGN_32BYTES(uint8_t rtext[96]);
 uint8_t workBuffer[_MAX_SS];
 
 /* Private functions ---------------------------------------------------------*/

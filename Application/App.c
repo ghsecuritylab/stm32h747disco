@@ -26,6 +26,7 @@
 #include "LcdLog.h"
 #include <stdint.h>
 #include "SDFatFs.h"
+#include "AudioPlayer.h"
 
 #ifndef VERSION
 #define VERSION "X.X.X"
@@ -45,8 +46,6 @@ void APP_init()
 	osThreadDef(App_Thread, APP_task, osPriorityNormal, 0, configMINIMAL_STACK_SIZE * 5);
 	osThreadCreate(osThread(App_Thread), NULL);
 
-	SDFatFs_Init();
-
 }
 
 /**
@@ -64,6 +63,8 @@ void APP_task(const void *arg)
 
 	/* Initialize webserver demo */
 	http_server_netconn_init();
+
+	SDFatFs_Init();
 
 	osThreadDef(InternetTest_Thread, APP_InternetTest, osPriorityNormal, 0, configMINIMAL_STACK_SIZE * 5);
 	osThreadCreate(osThread(InternetTest_Thread), NULL);
@@ -151,7 +152,7 @@ void APP_InternetTest(const void *arg)
 	udp_bind(ptel_pcb, IP_ADDR_ANY, 5000);
 	udp_recv(ptel_pcb, udp_echo_recv, NULL);
 
-	AudioPlayer_Init();
+//	AudioPlayer_Init();
 
 	while (1)
 	{
