@@ -35,7 +35,6 @@ BSP_AUDIO_Init_t AudioPlayInit;
 
 ALIGN_32BYTES(static AUDIO_BufferTypeDef buffer_ctl);
 
-osMessageQId audioQueue = NULL;
 TickType_t frameTime = 0;
 uint8_t audioFlag = 0;
 
@@ -44,12 +43,6 @@ static void FS_FileOperations(void);
 static void SDFatFs_task(const void *arg);
 
 void SDFatFs_Init() {
-
-	osMessageQDef_t def;
-	def.item_sz = sizeof(uint8_t*);
-	def.queue_sz = 4;
-
-	audioQueue = osMessageCreate(&def, NULL);
 
 	osThreadDef(SDFatFs_Thread, SDFatFs_task, osPriorityHigh, 0,
 			configMINIMAL_STACK_SIZE * 5);

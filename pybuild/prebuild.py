@@ -1,3 +1,32 @@
+# Copyright (c) 2020, Ericson Joseph
+# 
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without modification,
+# are permitted provided that the following conditions are met:
+# 
+#     * Redistributions of source code must retain the above copyright notice,
+#       this list of conditions and the following disclaimer.
+#     * Redistributions in binary form must reproduce the above copyright notice,
+#       this list of conditions and the following disclaimer in the documentation
+#       and/or other materials provided with the distribution.
+#     * Neither the name of pyMakeTool nor the names of its contributors
+#       may be used to endorse or promote products derived from this software
+#       without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
 from pathlib import Path
 import importlib.util
 import inspect
@@ -6,7 +35,11 @@ import os
 import time
 import subprocess
 import json
+import re
 from . import eclipse_cproject as cp
+from builtins import dict
+
+USE_EXCLUDE_FOLDERS = True
 
 
 def printHeader(key: str, num: int):
@@ -37,8 +70,24 @@ def macrosDictToString(macros):
             else:
                 mstr.append('-D{}'.format(key))
     
-    print(mstr)
     return ' '.join(mstr)
+
+def compilerOptsByModuleToLine(compOpts):
+    mstr = []
+    for moduleCompileOps in compOpts:
+        if isinstance(moduleCompileOps, dict):
+            for key in moduleCompileOps:
+                if (key == 'MACROS' and isinstance(moduleCompileOps[key], dict)):
+                    macros = macrosDictToString(moduleCompileOps[key])
+                    mstr.append(macros)
+                else:
+                    mstr.append(listToString(moduleCompileOps[key]))
+            
+        elif isinstance(moduleCompileOps, list):
+            for item in moduleCompileOps:
+                mstr.append(item)
+    
+    return ' '.join(mstr)            
 
 def addToList(dstList: list, values):
     if isinstance(values, list):
@@ -66,7 +115,7 @@ def readModule(srcs: list, incs: list, flags: list, modPath, compilerOpts):
     addToList(incs, result)
     try:
         result = getattr(mod, 'getCompilerOpts')(workspace)
-        addToList(flags, result)
+        flags.append(result)
     except:
         pass
 
@@ -139,6 +188,70 @@ def read_Makefilepy():
 
     makevars.close()
 
+    targetsmk = open('targets.mk', 'w')
+
+    try:
+        targets = getattr(mod, 'getTargetsScript')()
+        if isinstance(targets, dict):
+            if len(targets) == 0:
+                pass
+            else:
+                labels = []
+                targetval = []
+                targetsct = []
+                logkeys = []
+                for k in targets:
+                    labels.append(k)
+                    targetval.append(targets[k]['FILE'])
+                    targetsct.append(targets[k]['SCRIPT'])
+                    if 'LOGKEY' in targets[k]:
+                        logkeys.append(targets[k]['LOGKEY'])
+                    else:
+                        logkeys.append('>>')
+
+                for i in range(len(targetval)):
+                    targetsmk.write("{0:<10} = {1}\n".format(labels[i], targetval[i]))
+
+                targetsmk.write('\nTARGETS = $({})\n\n'.format(labels[len(targetval)-1]))
+
+                for i in range(len(labels)):
+                    if labels[i] == 'TARGET':
+                        targetsmk.write("\n$({}): {}\n".format(labels[i],'$(OBJECTS)'))
+                    else:
+                        targetsmk.write("\n$({}): $({})\n".format(labels[i],labels[i-1]))
+                    
+                    targetsmk.write('\t$(call logger-compile,"{}",$@)\n'.format(logkeys[i]))
+                    script = targetsct[i]
+                    script = ' '.join(script)
+                    targetsmk.write('\t{}\n'.format(script))
+
+                targetsmk.write('\n')
+
+                targetsmk.write("\n{}:\n".format('clean_targets'))
+                targetlist = ('$('+l+')' for l in labels)
+                targetsmk.write('\trm -rf {}\n'.format(' '.join(targetlist)))
+
+                # keytargetlist = list(targets.keys())
+                # keytarget = keytargetlist[0]
+                # targetsmk.write("{} = {}\n".format('TARGET', keytarget))
+                # targetsmk.write('\n\n')
+                # targetsmk.write("{}: {}\n".format('$(TARGET)','$(OBJECTS)'))
+                # targetsmk.write('\t{}\n'.format('$(call logger-compile,"LD",$@)'))
+                # script = targets[keytarget]
+                # script = ' '.join(script)
+                # targetsmk.write('\t{}\n'.format(script))
+                # targetsmk.write('\n\n')
+                # targetsmk.write('{} = {}'.format('TARGETS', '$(TARGET)'))
+
+                # for idx in range(1, len(keytargetlist)):
+
+
+
+    except:
+        pass
+
+    targetsmk.close()
+
     return projSettings, compOpts, compSet
 # ------------------------------------------------------
 # ------------------------------------------------------
@@ -187,7 +300,7 @@ for mod in modules:
         for src in mod[0]:
             objs = str(src).replace('.c', '.o').replace('.s', '.o')
             srcsfile.write("{} : CFLAGS = {}\n".format(
-                projSettings['FOLDER_OUT'] / str(objs), listToString(mod[2])))
+                projSettings['FOLDER_OUT'] / str(objs), compilerOptsByModuleToLine(mod[2])))
 
     srcsfile.write('\n')
 
@@ -198,10 +311,13 @@ srcsfile.close()
 
 strIncs = []
 aux = []
+
 if compilerSettings['INCLUDES']:
     aux += compilerSettings['INCLUDES']
+if includes:
     aux += includes
-    strIncs = [str(i) for i in aux]
+
+strIncs = [str(i) for i in aux]
 
 defines = []
 if compilerOpts['MACROS']:
@@ -257,94 +373,113 @@ fileout.close()
 #     else:
 #         cproject.write(line)
 
-cproject_setting = {
-    'C_INCLUDES': strIncs,
-    'C_SYMBOLS': compilerOpts['MACROS']
-}
-
-cp.generate_cproject(cproject_setting)
-
 # print("-------------------------------------------------")
 # print("All folders")
 # Exclude folders
 
-allIncFoldes = []
-includes = [str(i) for i in includes]
-
-for filename in Path('.').rglob('*.h'):
-    allIncFoldes.append(str(filename.parent))
-
-allIncFoldes = list(dict.fromkeys(allIncFoldes))
-
-allIncFoldes.sort()
-
-filtedist = []
-parent = ""
-for p in allIncFoldes:
-    if parent == "":
-        parent = p
-        filtedist.append(p)
-    elif(p.startswith(parent)):
-        None
-    else:
-        parent = p
-        filtedist.append(p)
-
-allIncFoldes = filtedist
-
-# for a in allIncFoldes:
-#     print(a)
-
-
-# print("-------------------------------------------------")
-# print("Build Includes")
-# for inc in includes:
-#     print(inc)
-
-# print("-------------------------------------------------")
-# print("Filter")
-
 listToExclude = []
 
-for allinc in allIncFoldes:
-    if not any(allinc.startswith(a) for a in includes):
-        listToExclude.append(allinc)
+if (USE_EXCLUDE_FOLDERS):
+    allIncFoldes = []
+    includes = [str(i) for i in includes]
 
-for r in listToExclude:
-    mvpath = Path(r)
-    if (mvpath.name.startswith("_")):
-        continue
-    
-    if Path('Test') in mvpath.parents:
-        continue
+    for filename in Path('.').rglob('*.h'):
+        allIncFoldes.append(str(filename.parent))
 
-    if str(mvpath) == '.' or str(mvpath) == '..':
-        continue
+    allIncFoldes = list(dict.fromkeys(allIncFoldes))
 
-    dstpath = str(mvpath.parent / str("_"+mvpath.name))
-    print("mv {} {}".format(mvpath, dstpath))
-    try:
-        os.rename(mvpath, dstpath)
-    except:
-        None
+    allIncFoldes.sort()
 
-listToInclude = []
+#     print(allIncFoldes)
 
-for inc in includes:
-    nameInc = Path(inc).name
-    pathExclude = str(Path(inc).parent / str("_"+nameInc))
-    if pathExclude in allIncFoldes:
-        listToInclude.append(pathExclude)
-
-# print("TO INCLUDE --------------------------------------")
-
-for t in listToInclude:
-    mvpath = Path(t)
-    if str(mvpath.name).startswith("_"):
-        dstname = str(mvpath.name)[1:]
-        dstpath = str(mvpath).replace(mvpath.name, dstname)
-        print("mv {} {}".format(mvpath, dstpath))
-        try:
-            os.rename(mvpath, dstpath)
-        except:
+    filtedist = []
+    parent = ""
+    for p in allIncFoldes:
+        if parent == "":
+            parent = p
+            filtedist.append(p)
+        elif(p.startswith(parent+"/")):
             None
+        else:
+            parent = p
+            filtedist.append(p)
+
+    allIncFoldes = filtedist
+
+#     for a in allIncFoldes:
+#         print(a)
+
+
+    # print("-------------------------------------------------")
+    # print("Build Includes")
+    # for inc in includes:
+    #     print(inc)
+
+    # print("-------------------------------------------------")
+    # print("Filter")
+    p = re.compile('^(I|i)nc(lude)*$')
+
+    for allinc in allIncFoldes:
+        aux = allinc + '/'
+        if not any(aux.startswith(a + "/") for a in includes):
+            if not str(allinc).startswith('Test/ceedling') and not allinc == '.':
+                auxpath = Path(allinc)
+                if p.match(auxpath.name):
+                    listToExclude.append(str(auxpath.parent))
+                else:
+                    listToExclude.append(allinc)
+            
+    listToExclude.append('Test/ceedling')
+    
+    
+    
+#     for r in listToExclude:
+#         mvpath = Path(r)
+#         if (mvpath.name.startswith("_")):
+#             continue
+#         
+#         if Path('Test') in mvpath.parents:
+#             continue
+# 
+#         if str(mvpath) == '.' or str(mvpath) == '..':
+#             continue
+# 
+#         dstpath = str(mvpath.parent / str("_"+mvpath.name))
+#         print("mv {} {}".format(mvpath, dstpath))
+#         try:
+#             os.rename(mvpath, dstpath)
+#         except:
+#             None
+
+#     print(listToExclude)
+
+#     listToInclude = []
+# 
+#     for inc in includes:
+#         nameInc = Path(inc).name
+#         pathExclude = str(Path(inc).parent / str("_"+nameInc))
+#         if pathExclude in allIncFoldes:
+#             listToInclude.append(pathExclude)
+# 
+#     # print("TO INCLUDE --------------------------------------")
+# 
+#     for t in listToInclude:
+#         mvpath = Path(t)
+#         if str(mvpath.name).startswith("_"):
+#             dstname = str(mvpath.name)[1:]
+#             dstpath = str(mvpath).replace(mvpath.name, dstname)
+#             print("mv {} {}".format(mvpath, dstpath))
+#             try:
+#                 os.rename(mvpath, dstpath)
+#             except:
+#                 None
+
+cproject_setting = {
+    'C_INCLUDES': strIncs,
+    'C_SYMBOLS': compilerOpts['MACROS'],
+    'C_EXCLUDE': listToExclude
+}
+
+cp.generate_cproject(cproject_setting)
+
+
