@@ -108,13 +108,11 @@ def read_Makefilepy():
 
     try:
         projSettings = getattr(mod, K.MK_F_GETPROJECTSETTINGS)()
-        if projSettings['PROJECT_NAME']:
-            makevars.write('PROJECT     = {}\n'.format(
-                projSettings['PROJECT_NAME']))
-        if projSettings['FOLDER_OUT']:
-            projSettings['FOLDER_OUT'] = Path(projSettings['FOLDER_OUT'])
-            makevars.write('PROJECT_OUT = {}\n'.format(
-                projSettings['FOLDER_OUT']))
+        if projSettings[K.PROJSETT_PROJECTNAME]:
+            makevars.write('{0:<15} = {1}\n'.format('PROJECT', projSettings[K.PROJSETT_PROJECTNAME]))
+        if projSettings[K.PROJSETT_FOLDEROUT]:
+            projSettings[K.PROJSETT_FOLDEROUT] = Path(projSettings[K.PROJSETT_FOLDEROUT])
+            makevars.write('{0:<15} = {1}\n'.format('PROJECT_OUT', projSettings[K.PROJSETT_FOLDEROUT]))
     except Exception as e:
         print(e)
 
@@ -187,7 +185,7 @@ def read_Makefilepy():
                         logkeys.append('>>')
 
                 for i in range(len(targetval)):
-                    targetsmk.write("{0:<10} = {1}\n".format(labels[i], targetval[i]))
+                    targetsmk.write("{0:<15} = {1}\n".format(labels[i], targetval[i]))
 
                 targetsmk.write('\nTARGETS = $({})\n\n'.format(labels[len(targetval)-1]))
 

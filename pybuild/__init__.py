@@ -34,6 +34,7 @@ class MKVARS():
     OBJCOPY = '$(OBJCOPY)'
     SIZE    = '$(SIZE)'
     TARGET  = '$(TARGET)'
+    PROJECT = '$(PROJECT)'
 
 
 def MOD_PATH(wk):
