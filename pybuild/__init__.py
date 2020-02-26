@@ -32,6 +32,7 @@ class MKVARS():
     OBJECTS = '$(OBJECTS)' 
     LDFLAGS = '$(LDFLAGS)'
     OBJCOPY = '$(OBJCOPY)'
+    SIZE    = '$(SIZE)'
     TARGET  = '$(TARGET)'
 
 

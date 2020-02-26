@@ -136,7 +136,8 @@ static void FS_FileOperations(void) {
 			}
 		}
 
-		if (f_open(&MyFile, "MG_96KHZ2CH.RAW", FA_READ) == FR_OK) {
+//		if (f_open(&MyFile, "MG_96KHZ2CH.RAW", FA_READ) == FR_OK) {
+		if (f_open(&MyFile, "GX_48KHZ2CH.RAW", FA_READ) == FR_OK) {
 			res = f_read(&MyFile, audioFrame, sizeof(audioFrame),
 					(void*) &bytesread);
 			if (res == FR_OK) {
@@ -144,7 +145,7 @@ static void FS_FileOperations(void) {
 				BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
 				AudioPlayInit.Device = AUDIO_OUT_DEVICE_HEADPHONE;
 				AudioPlayInit.ChannelsNbr = 1;
-				AudioPlayInit.SampleRate = AUDIO_FREQUENCY_96K;
+				AudioPlayInit.SampleRate = AUDIO_FREQUENCY_48K;
 				AudioPlayInit.BitsPerSample = AUDIO_RESOLUTION_16B;
 				AudioPlayInit.Volume = 75;
 

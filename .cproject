@@ -114,9 +114,9 @@
 <listOptionValue builtIn="false" value="VERSION=&quot;1.0.1&quot;"/>
 <listOptionValue builtIn="false" value="IS_BETA=0"/>
 <listOptionValue builtIn="false" value="APP_NUMBER=1"/>
-<listOptionValue builtIn="false" value="COMMIT_HASH=&quot;01762fc&quot;"/>
+<listOptionValue builtIn="false" value="COMMIT_HASH=&quot;e33be41&quot;"/>
 <listOptionValue builtIn="false" value="BRANCH_NAME=&quot;master&quot;"/>
-<listOptionValue builtIn="false" value="CODE_VERSION=&quot;v0.0.3-7-g01762fc&quot;"/>
+<listOptionValue builtIn="false" value="CODE_VERSION=&quot;v0.0.3-8-ge33be41&quot;"/>
 									<!--wildcard_c_symbols-->
 
 								</option>
