@@ -11,7 +11,7 @@
 #include "LcdLog.h"
 #include "cmsis_os.h"
 
-#define AUDIO_SIZE	640 // BYTES
+#define AUDIO_SIZE     960*2 // BYTES
 #define ATTENUATOR 1
 #define AUDIO_BUFFER_SIZE  AUDIO_SIZE*2
 
@@ -37,12 +37,15 @@ ALIGN_32BYTES(static AUDIO_BufferTypeDef buffer_ctl);
 
 TickType_t frameTime = 0;
 uint8_t audioFlag = 0;
+QueueHandle_t audioQueue = NULL;
 
 static void SD_Initialize(void);
 static void FS_FileOperations(void);
 static void SDFatFs_task(const void *arg);
 
 void SDFatFs_Init() {
+
+	audioQueue = xQueueCreate(4, sizeof(uint8_t));
 
 	osThreadDef(SDFatFs_Thread, SDFatFs_task, osPriorityHigh, 0,
 			configMINIMAL_STACK_SIZE * 5);
@@ -70,8 +73,10 @@ void SDFatFs_task(const void *arg) {
 
 	}
 
+	LCDLog_RLog(2, "Audio End!!!");
+
 	for (;;) {
-		osDelay(1000);
+		vTaskDelay(portMAX_DELAY);
 	}
 
 }
@@ -137,7 +142,7 @@ static void FS_FileOperations(void) {
 		}
 
 //		if (f_open(&MyFile, "MG_96KHZ2CH.RAW", FA_READ) == FR_OK) {
-		if (f_open(&MyFile, "GX_48KHZ2CH.RAW", FA_READ) == FR_OK) {
+		if (f_open(&MyFile, "QU_48KHZ2CH.RAW", FA_READ) == FR_OK) {
 			res = f_read(&MyFile, audioFrame, sizeof(audioFrame),
 					(void*) &bytesread);
 			if (res == FR_OK) {
@@ -147,32 +152,40 @@ static void FS_FileOperations(void) {
 				AudioPlayInit.ChannelsNbr = 1;
 				AudioPlayInit.SampleRate = AUDIO_FREQUENCY_48K;
 				AudioPlayInit.BitsPerSample = AUDIO_RESOLUTION_16B;
-				AudioPlayInit.Volume = 75;
+				AudioPlayInit.Volume = 69;
 
 				if (BSP_AUDIO_OUT_Init(0, &AudioPlayInit) == 0) {
-					LCDLog_RLog(2, "Audio Initialize OK");
+					LCDLog_RLog(2,
+							"Play Bohemian Rhapsody PCM 16bits 96Khz ...");
 					BSP_AUDIO_OUT_Play(0, (uint8_t*) &buffer_ctl.buff[0],
 					AUDIO_BUFFER_SIZE);
 				}
 			}
 
+			volatile uint32_t ticks = osKernelSysTick();
+
 			for (;;) {
+				xQueueReceive(audioQueue, &audioFlag, portMAX_DELAY);
 				if (audioFlag == 1) {
-					audioFlag = 0;
-					res = f_read(&MyFile, audioFrameHalf, sizeof(audioFrameHalf),
-							(void*) &bytesread);
-					if (res == FR_OK) {
-						memcpy(&buffer_ctl.buff[0], audioFrameHalf, sizeof(audioFrameHalf));
-					} else {
-						break;
-					}
-				}else if (audioFlag == 2){
+					volatile uint32_t ctick = osKernelSysTick();
+					ticks = ctick - ticks;
+					ticks = ctick;
 					audioFlag = 0;
 					res = f_read(&MyFile, audioFrameHalf,
 							sizeof(audioFrameHalf), (void*) &bytesread);
-					if (res == FR_OK) {
-						memcpy(&buffer_ctl.buff[AUDIO_BUFFER_SIZE/2], audioFrameHalf,
+					if (bytesread == sizeof(audioFrameHalf) && res == FR_OK) {
+						memcpy(&buffer_ctl.buff[0], audioFrameHalf,
 								sizeof(audioFrameHalf));
+					} else {
+						break;
+					}
+				} else if (audioFlag == 2) {
+					audioFlag = 0;
+					res = f_read(&MyFile, audioFrameHalf,
+							sizeof(audioFrameHalf), (void*) &bytesread);
+					if (bytesread == sizeof(audioFrameHalf) && res == FR_OK) {
+						memcpy(&buffer_ctl.buff[AUDIO_BUFFER_SIZE / 2],
+								audioFrameHalf, sizeof(audioFrameHalf));
 					} else {
 						break;
 					}
@@ -184,9 +197,13 @@ static void FS_FileOperations(void) {
 }
 
 void BSP_AUDIO_OUT_TransferComplete_CallBack(uint32_t Instance) {
-	audioFlag = 2;
+	uint8_t auxaudioFlag = 2;
+	BaseType_t xTaskWokenByReceive = pdFALSE;
+	xQueueSendFromISR(audioQueue, &auxaudioFlag, &xTaskWokenByReceive);
 }
 
 void BSP_AUDIO_OUT_HalfTransfer_CallBack(uint32_t Instance) {
-	audioFlag = 1;
+	uint8_t auxaudioFlag = 1;
+	BaseType_t xTaskWokenByReceive = pdFALSE;
+	xQueueSendFromISR(audioQueue, &auxaudioFlag, &xTaskWokenByReceive);
 }
